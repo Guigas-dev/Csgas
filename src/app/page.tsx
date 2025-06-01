@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, TrendingUp, Info, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -57,12 +57,8 @@ const defaultingCustomersData = [
 ];
 const totalDue = defaultingCustomersData.reduce((sum, item) => sum + item.value, 0);
 
-const currentStock = 75;
+
 const maxStock = 100;
-const stockChartData = [
-  { name: "Em Estoque", value: currentStock, fill: "hsl(var(--chart-1))" },
-  { name: "Capacidade Livre", value: maxStock - currentStock, fill: "hsl(var(--border))" }
-];
 const stockPieChartConfig = {
   value: { label: "Unidades" },
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
@@ -99,7 +95,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         {isLoading ? (
            <div className="text-2xl font-bold text-foreground">Carregando...</div>
         ) : (
-          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && title.toLowerCase().includes("vendas totais") ? formatCurrency(value) : value}</div>
+          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio")) ? formatCurrency(value) : value}</div>
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
@@ -124,6 +120,13 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const currentStockForChart = stockCount ?? 0;
+  const stockChartData = [
+    { name: "Em Estoque", value: currentStockForChart, fill: "hsl(var(--chart-1))" },
+    { name: "Capacidade Livre", value: maxStock - currentStockForChart, fill: "hsl(var(--border))" }
+  ];
+
+
   return (
     <div className="container mx-auto">
       <PageHeader title="Dashboard" description="Visão geral do seu negócio." />
@@ -133,30 +136,30 @@ export default function DashboardPage() {
           title="Vendas Totais (Mês)"
           value={12345}
           subText="+15% Mês Anterior"
-          icon={<DollarSign className="h-5 w-5 text-primary" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
+          icon={<DollarSign className="h-5 w-5 text-foreground" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
           valueColor="text-primary"
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
           value={85}
           subText="+5 Mês Anterior"
-          icon={<CheckCircle2 className="h-5 w-5 text-success" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
+          icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
           valueColor="text-success"
         />
         <KpiCard
           title="Vendas Pendentes"
           value={12}
           subText={formatCurrency(1250.00)}
-          icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
+          icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
           valueColor="text-destructive"
           subTextColor="text-destructive"
         />
         <KpiCard
           title="Botijões em Estoque"
           value={stockCount ?? ""}
-          icon={<PackageSearch className="h-5 w-5 text-primary" />}
+          icon={<PackageSearch className="h-5 w-5 text-foreground" />}
           isLoading={isLoadingStock}
           valueColor="text-foreground"
         />
@@ -245,7 +248,7 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl flex items-center">
-                  <Archive className="mr-2 h-5 w-5 text-primary" />
+                  <Archive className="mr-2 h-5 w-5 text-foreground" />
                   Nível de Estoque
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
@@ -283,13 +286,13 @@ export default function DashboardPage() {
                 </ChartContainer>
               </div>
               <div className="text-center md:text-left flex-1">
-                <p className="text-3xl font-bold text-foreground">{currentStock}
+                <p className="text-3xl font-bold text-foreground">{currentStockForChart}
                   <span className="text-xl text-muted-foreground"> / {maxStock}</span>
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
-                <Progress value={(currentStock / maxStock) * 100} className="w-full h-2.5" />
+                <Progress value={(currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
                  <p className="text-xs text-muted-foreground mt-4">
-                  {((currentStock / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
+                  {((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
                 </p>
               </div>
             </CardContent>
@@ -299,7 +302,7 @@ export default function DashboardPage() {
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
               <CardTitle className="text-xl flex items-center">
-                <ListChecks className="mr-2 h-5 w-5 text-primary" />
+                <ListChecks className="mr-2 h-5 w-5 text-foreground" />
                 Métricas Chave
               </CardTitle>
             </CardHeader>
@@ -329,7 +332,7 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl flex items-center">
-                  <UserX className="mr-2 h-5 w-5 text-destructive" />
+                  <UserX className="mr-2 h-5 w-5 text-foreground" />
                   Clientes Inadimplentes
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
