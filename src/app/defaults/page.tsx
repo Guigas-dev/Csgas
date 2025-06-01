@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -18,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -118,10 +118,10 @@ export default function DefaultsPage() {
         description="Acompanhe e gerencie os pagamentos pendentes."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" className="text-foreground border-input hover:bg-accent hover:text-accent-foreground">
+            <Button variant="outline" className="text-foreground border-input hover:bg-accent-hover-bg hover:text-accent-foreground">
               <Filter className="mr-2 h-4 w-4" /> Filtros
             </Button>
-            <Button onClick={handleAddDefault} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={handleAddDefault} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Pendência
             </Button>
           </div>
@@ -181,11 +181,11 @@ export default function DefaultsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="customer" className="text-right text-muted-foreground">Cliente</Label>
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="space-y-1">
+                <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <Select value={formData.customerId} onValueChange={val => setFormData({...formData, customerId: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
@@ -193,18 +193,18 @@ export default function DefaultsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="value" className="text-right text-muted-foreground">Valor (R$)</Label>
-                <Input id="value" type="number" step="0.01" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className="col-span-3 bg-input text-foreground" required />
+              <div className="space-y-1">
+                <Label htmlFor="value" className="text-muted-foreground">Valor (R$)</Label>
+                <Input id="value" type="number" step="0.01" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className="bg-input text-foreground" required />
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="dueDate" className="text-right text-muted-foreground">Vencimento</Label>
+               <div className="space-y-1">
+                <Label htmlFor="dueDate" className="text-muted-foreground">Vencimento</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "col-span-3 justify-start text-left font-normal bg-input text-foreground hover:bg-accent hover:text-accent-foreground",
+                        "w-full justify-start text-left font-normal bg-input text-foreground hover:bg-accent-hover-bg hover:text-accent-foreground",
                         !formData.dueDate && "text-muted-foreground"
                       )}
                     >
@@ -222,10 +222,10 @@ export default function DefaultsPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentStatus" className="text-right text-muted-foreground">Status</Label>
+              <div className="space-y-1">
+                <Label htmlFor="paymentStatus" className="text-muted-foreground">Status</Label>
                  <Select value={formData.paymentStatus} onValueChange={val => setFormData({...formData, paymentStatus: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Status do pagamento" />
                   </SelectTrigger>
                   <SelectContent>
@@ -233,14 +233,14 @@ export default function DefaultsPage() {
                   </SelectContent>
                 </Select>
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="saleId" className="text-right text-muted-foreground">ID Venda (Opc)</Label>
-                <Input id="saleId" value={formData.saleId} onChange={e => setFormData({...formData, saleId: e.target.value})} className="col-span-3 bg-input text-foreground" />
+               <div className="space-y-1">
+                <Label htmlFor="saleId" className="text-muted-foreground">ID Venda (Opc)</Label>
+                <Input id="saleId" value={formData.saleId} onChange={e => setFormData({...formData, saleId: e.target.value})} className="bg-input text-foreground" />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{editingDefault ? "Salvar Alterações" : "Adicionar Pendência"}</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">{editingDefault ? "Salvar Alterações" : "Adicionar Pendência"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

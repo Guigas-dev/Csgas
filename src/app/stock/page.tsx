@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -18,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -35,14 +35,10 @@ import { format } from "date-fns";
 
 // Dummy data
 const initialStockMovements = [
-  { id: "sm1", type: "INPUT", origin: "Manual", date: new Date(2024, 6, 10, 10, 0), quantity: 50 },
-  { id: "sm2", type: "OUTPUT", origin: "Sale", date: new Date(2024, 6, 15, 14, 30), quantity: 1, relatedSaleId: "s1" },
-  { id: "sm3", type: "OUTPUT", origin: "Sale", date: new Date(2024, 6, 14, 11, 15), quantity: 2, relatedSaleId: "s2" },
+  { id: "sm1", type: "INPUT", origin: "Manual", date: new Date(2024, 6, 10, 10, 0), quantity: 50, notes: "Compra inicial" },
+  { id: "sm2", type: "OUTPUT", origin: "Sale", date: new Date(2024, 6, 15, 14, 30), quantity: 1, relatedSaleId: "s1", notes: "" },
+  { id: "sm3", type: "OUTPUT", origin: "Sale", date: new Date(2024, 6, 14, 11, 15), quantity: 2, relatedSaleId: "s2", notes: "" },
 ];
-
-const currentStockLevel = initialStockMovements.reduce((acc, mov) => {
-  return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
-}, 0);
 
 const movementTypes = ["INPUT", "OUTPUT"];
 const movementOrigins = ["Manual", "Sale", "Adjustment", "Loss"];
@@ -61,6 +57,10 @@ export default function StockPage() {
   };
   const [formData, setFormData] = useState(initialFormData);
 
+  const currentStockLevel = stockMovements.reduce((acc, mov) => {
+    return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
+  }, 0);
+
   const handleOpenForm = (type: "INPUT" | "OUTPUT") => {
     setCurrentMovementType(type);
     setFormData({ ...initialFormData, type });
@@ -77,9 +77,8 @@ export default function StockPage() {
       quantity: parseInt(formData.quantity) || 0,
       notes: formData.notes,
     };
-    setStockMovements(prev => [newMovement, ...prev]);
+    setStockMovements(prev => [newMovement, ...prev].sort((a,b) => b.date.getTime() - a.date.getTime()));
     setIsFormOpen(false);
-    // Recalculate stock level (or manage it in state)
   };
 
   return (
@@ -121,6 +120,7 @@ export default function StockPage() {
                 <TableHead>Data/Hora</TableHead>
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Ref. Venda</TableHead>
+                <TableHead>Observações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,6 +135,7 @@ export default function StockPage() {
                   <TableCell>{format(mov.date, "dd/MM/yyyy HH:mm")}</TableCell>
                   <TableCell>{mov.quantity}</TableCell>
                   <TableCell>{mov.relatedSaleId || "N/A"}</TableCell>
+                  <TableCell>{mov.notes || "N/A"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -154,22 +155,22 @@ export default function StockPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantity" className="text-right text-muted-foreground">Quantidade</Label>
+            <div className="space-y-4 py-4">
+              <div className="space-y-1">
+                <Label htmlFor="quantity" className="text-muted-foreground">Quantidade</Label>
                 <Input 
                   id="quantity" 
                   type="number" 
                   value={formData.quantity} 
                   onChange={e => setFormData({...formData, quantity: e.target.value})} 
-                  className="col-span-3 bg-input text-foreground" 
+                  className="bg-input text-foreground" 
                   required 
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="origin" className="text-right text-muted-foreground">Origem</Label>
+              <div className="space-y-1">
+                <Label htmlFor="origin" className="text-muted-foreground">Origem</Label>
                 <Select value={formData.origin} onValueChange={val => setFormData({...formData, origin: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Origem da movimentação" />
                   </SelectTrigger>
                   <SelectContent>
@@ -177,19 +178,19 @@ export default function StockPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="notes" className="text-right text-muted-foreground">Observações</Label>
+              <div className="space-y-1">
+                <Label htmlFor="notes" className="text-muted-foreground">Observações</Label>
                 <Input 
                   id="notes" 
                   value={formData.notes} 
                   onChange={e => setFormData({...formData, notes: e.target.value})} 
-                  className="col-span-3 bg-input text-foreground" 
+                  className="bg-input text-foreground" 
                 />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">Registrar</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">Registrar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

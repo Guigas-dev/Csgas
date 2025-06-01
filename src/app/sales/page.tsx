@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -17,7 +18,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -120,10 +120,10 @@ export default function SalesPage() {
         description="Gerencie o histórico de vendas e registre novas transações."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" className="text-foreground border-input hover:bg-accent hover:text-accent-foreground">
+            <Button variant="outline" className="text-foreground border-input hover:bg-accent-hover-bg hover:text-accent-foreground">
               <Filter className="mr-2 h-4 w-4" /> Filtros
             </Button>
-            <Button onClick={handleAddSale} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={handleAddSale} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Registrar Venda
             </Button>
           </div>
@@ -181,11 +181,11 @@ export default function SalesPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="customer" className="text-right text-muted-foreground">Cliente</Label>
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="space-y-1">
+                <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <Select value={formData.customerId} onValueChange={val => setFormData({...formData, customerId: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Selecione (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -193,14 +193,14 @@ export default function SalesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="value" className="text-right text-muted-foreground">Valor (R$)</Label>
-                <Input id="value" type="number" step="0.01" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className="col-span-3 bg-input text-foreground" required />
+              <div className="space-y-1">
+                <Label htmlFor="value" className="text-muted-foreground">Valor (R$)</Label>
+                <Input id="value" type="number" step="0.01" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className="bg-input text-foreground" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentMethod" className="text-right text-muted-foreground">Pagamento</Label>
+              <div className="space-y-1">
+                <Label htmlFor="paymentMethod" className="text-muted-foreground">Pagamento</Label>
                  <Select value={formData.paymentMethod} onValueChange={val => setFormData({...formData, paymentMethod: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Método de pagamento" />
                   </SelectTrigger>
                   <SelectContent>
@@ -208,14 +208,14 @@ export default function SalesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right text-muted-foreground">Data</Label>
+              <div className="space-y-1">
+                <Label htmlFor="date" className="text-muted-foreground">Data</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "col-span-3 justify-start text-left font-normal bg-input text-foreground hover:bg-accent hover:text-accent-foreground",
+                        "w-full justify-start text-left font-normal bg-input text-foreground hover:bg-accent-hover-bg hover:text-accent-foreground",
                         !formData.date && "text-muted-foreground"
                       )}
                     >
@@ -233,10 +233,10 @@ export default function SalesPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right text-muted-foreground">Status</Label>
+              <div className="space-y-1">
+                <Label htmlFor="status" className="text-muted-foreground">Status</Label>
                  <Select value={formData.status} onValueChange={val => setFormData({...formData, status: val})}>
-                  <SelectTrigger className="col-span-3 bg-input text-foreground">
+                  <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Status da venda" />
                   </SelectTrigger>
                   <SelectContent>
@@ -244,14 +244,14 @@ export default function SalesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="gasCanistersQuantity" className="text-right text-muted-foreground">Botijões</Label>
-                <Input id="gasCanistersQuantity" type="number" value={formData.gasCanistersQuantity} onChange={e => setFormData({...formData, gasCanistersQuantity: e.target.value})} className="col-span-3 bg-input text-foreground" required />
+              <div className="space-y-1">
+                <Label htmlFor="gasCanistersQuantity" className="text-muted-foreground">Botijões</Label>
+                <Input id="gasCanistersQuantity" type="number" value={formData.gasCanistersQuantity} onChange={e => setFormData({...formData, gasCanistersQuantity: e.target.value})} className="bg-input text-foreground" required />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{editingSale ? "Salvar Venda" : "Registrar Venda"}</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">{editingSale ? "Salvar Venda" : "Registrar Venda"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

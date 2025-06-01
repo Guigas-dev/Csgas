@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -19,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +37,6 @@ export default function CustomersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<typeof initialCustomers[0] | null>(null);
 
-  // Basic form state, will be replaced by react-hook-form later
   const [formData, setFormData] = useState({ name: '', cpf: '', address: '', phone: ''});
 
   const handleAddCustomer = () => {
@@ -76,7 +75,7 @@ export default function CustomersPage() {
         title="Gerenciamento de Clientes"
         description="Adicione, edite ou remova registros de clientes."
         actions={
-          <Button onClick={handleAddCustomer} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={handleAddCustomer} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Cliente
           </Button>
         }
@@ -129,35 +128,35 @@ export default function CustomersPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right text-muted-foreground">
+            <div className="space-y-4 py-4">
+              <div className="space-y-1">
+                <Label htmlFor="name" className="text-muted-foreground">
                   Nome
                 </Label>
-                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="col-span-3 bg-input text-foreground" required />
+                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-input text-foreground" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cpf" className="text-right text-muted-foreground">
+              <div className="space-y-1">
+                <Label htmlFor="cpf" className="text-muted-foreground">
                   CPF
                 </Label>
-                <Input id="cpf" value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} className="col-span-3 bg-input text-foreground" required />
+                <Input id="cpf" value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} className="bg-input text-foreground" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="address" className="text-right text-muted-foreground">
+              <div className="space-y-1">
+                <Label htmlFor="address" className="text-muted-foreground">
                   Endereço
                 </Label>
-                <Input id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="col-span-3 bg-input text-foreground" />
+                <Input id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-input text-foreground" />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right text-muted-foreground">
+              <div className="space-y-1">
+                <Label htmlFor="phone" className="text-muted-foreground">
                   Telefone
                 </Label>
-                <Input id="phone" type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="col-span-3 bg-input text-foreground" />
+                <Input id="phone" type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="bg-input text-foreground" />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{editingCustomer ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">{editingCustomer ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
