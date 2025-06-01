@@ -232,30 +232,6 @@ export default function DashboardPage() {
                   Como funciona? <Info className="ml-1 h-3 w-3"/>
                 </span>
               </div>
-
-              {/* AI Assistant */}
-              <div className="relative p-6 rounded-lg bg-card/50 backdrop-blur-md border border-[hsl(var(--subtle-border))]">
-                 <Image 
-                    src="https://placehold.co/400x250.png" 
-                    alt="AI Assistant Visual" 
-                    width={400} 
-                    height={250} 
-                    className="absolute inset-0 w-full h-full object-cover opacity-10 rounded-lg z-0"
-                    data-ai-hint="abstract wave"
-                  />
-                <div className="relative z-10">
-                  <div className="flex items-center mb-2">
-                    <Lightbulb className="h-5 w-5 text-accent mr-2" />
-                    <h4 className="font-semibold text-foreground">Assistente IA</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Estou atualizando os dados do seu balanço agora...
-                  </p>
-                  <div className="w-full bg-border/30 rounded-full h-1.5">
-                    <div className="bg-accent h-1.5 rounded-full" style={{ width: "60%" }}></div>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
