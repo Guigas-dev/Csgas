@@ -89,10 +89,10 @@ export default function StockPage() {
         description="Monitore o nível e a movimentação de botijões de gás."
         actions={
           <div className="flex gap-2">
-            <Button onClick={() => handleOpenForm("INPUT")} className="bg-green-600 hover:bg-green-600/90 text-white">
+            <Button onClick={() => handleOpenForm("INPUT")} className="bg-success hover:bg-success/90 text-success-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Entrada Manual
             </Button>
-            <Button onClick={() => handleOpenForm("OUTPUT")} className="bg-red-600 hover:bg-red-600/90 text-white">
+            <Button onClick={() => handleOpenForm("OUTPUT")} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               <MinusCircle className="mr-2 h-4 w-4" /> Saída Manual
             </Button>
           </div>
@@ -127,7 +127,7 @@ export default function StockPage() {
               {stockMovements.map((mov) => (
                 <TableRow key={mov.id}>
                   <TableCell>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${mov.type === "INPUT" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${mov.type === "INPUT" ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}`}>
                       {mov.type === "INPUT" ? "Entrada" : "Saída"}
                     </span>
                   </TableCell>

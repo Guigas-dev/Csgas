@@ -150,13 +150,13 @@ export default function DefaultsPage() {
                   <TableCell>{formatCurrency(item.value)}</TableCell>
                   <TableCell>{format(item.dueDate, "dd/MM/yyyy")}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 text-xs rounded-full ${item.paymentStatus === "Paid" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    <span className={`px-2 py-1 text-xs rounded-full ${item.paymentStatus === "Paid" ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}`}>
                       {item.paymentStatus === "Paid" ? "Pago" : "Pendente"}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     {item.paymentStatus === "Pending" && (
-                       <Button variant="ghost" size="icon" onClick={() => handleMarkAsPaid(item.id)} className="hover:text-green-500" title="Marcar como Pago">
+                       <Button variant="ghost" size="icon" onClick={() => handleMarkAsPaid(item.id)} className="hover:text-success" title="Marcar como Pago">
                         <CheckCircle className="h-4 w-4" />
                       </Button>
                     )}
