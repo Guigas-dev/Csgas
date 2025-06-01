@@ -95,7 +95,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         {isLoading ? (
            <div className="text-2xl font-bold text-foreground">Carregando...</div>
         ) : (
-          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio")) ? formatCurrency(value) : value}</div>
+          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes")) ? formatCurrency(value) : value}</div>
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
@@ -138,7 +138,7 @@ export default function DashboardPage() {
           subText="+15% Mês Anterior"
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
-          valueColor="text-primary"
+          valueColor="text-foreground"
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
@@ -146,14 +146,14 @@ export default function DashboardPage() {
           subText="+5 Mês Anterior"
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
-          valueColor="text-success"
+          valueColor="text-foreground"
         />
         <KpiCard
           title="Vendas Pendentes"
-          value={12}
-          subText={formatCurrency(1250.00)}
+          value={1250.00} 
+          subText="12 Pendentes"
           icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
-          valueColor="text-destructive"
+          valueColor="text-foreground" 
           subTextColor="text-destructive"
         />
         <KpiCard
