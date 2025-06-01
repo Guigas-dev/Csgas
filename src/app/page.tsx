@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ChartContainer,
   ChartTooltip,
@@ -14,7 +15,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -45,6 +46,14 @@ const recentSalesData = [
   { id: "3", customerName: "Lucas Souza", amount: "R$ 99,00", date: "07/04/2024", status: "Pago" },
   { id: "4", customerName: "Mariana Costa", amount: "R$ 310,00", date: "06/04/2024", status: "Pago" },
 ];
+
+const defaultingCustomersData = [
+  { customerId: "2", customerName: "Maria Oliveira", value: 241.00, saleId: "s2", dueDate: new Date(2024, 7, 14), paymentStatus: "Pending" },
+  { customerId: "4", customerName: "Pedro Almeida", value: 150.00, saleId: "s4", dueDate: new Date(2024, 6, 30), paymentStatus: "Pending" },
+  { customerId: "5", customerName: "Julia Santos", value: 85.75, saleId: "s7", dueDate: new Date(2024, 7, 5), paymentStatus: "Pending" },
+];
+const totalDue = defaultingCustomersData.reduce((sum, item) => sum + item.value, 0);
+
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -111,11 +120,13 @@ export default function DashboardPage() {
                       dataKey="mesAnterior"
                       fill="hsl(var(--chart-2))"
                       radius={[4, 4, 0, 0]}
+                      barSize={15}
                     />
                     <Bar
                       dataKey="vendas"
                       fill="hsl(var(--chart-1))"
                       radius={[4, 4, 0, 0]}
+                      barSize={15}
                     />
                     <ChartLegend content={<ChartLegendContent />} />
                   </BarChart>
@@ -165,6 +176,7 @@ export default function DashboardPage() {
                   ))}
                 </TableBody>
               </Table>
+               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
             </CardContent>
           </Card>
         </div>
@@ -225,26 +237,46 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-destructive/20 text-destructive p-2 rounded-full mr-4">
+                    <div className="bg-destructive/20 text-destructive p-2 rounded-full mr-4 shrink-0">
                         <DollarSign className="h-5 w-5"/>
                     </div>
-                    <div>
+                    <div className="flex-grow">
                         <h4 className="font-semibold">Analisar Inadimplência</h4>
-                        <p className="text-xs text-muted-foreground">Você tem <strong>{formatCurrency(3150)}</strong> em dívidas ativas.</p>
-                        <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1">
-                            Ver Inadimplentes <ArrowRight className="ml-1 h-3 w-3"/>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Você tem <strong>{formatCurrency(totalDue)}</strong> em dívidas ativas de {defaultingCustomersData.length} clientes.
+                        </p>
+                        <div className="mb-2 text-xs">
+                          <Table className="text-xs">
+                            <TableHeader>
+                              <TableRow className="border-b-border/30">
+                                <TableHead className="h-auto px-1 py-0.5 text-muted-foreground">Cliente</TableHead>
+                                <TableHead className="h-auto px-1 py-0.5 text-right text-muted-foreground">Valor</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {defaultingCustomersData.slice(0, 3).map((item) => (
+                                <TableRow key={item.customerId} className="border-b-0">
+                                  <TableCell className="px-1 py-0.5 font-medium">{item.customerName}</TableCell>
+                                  <TableCell className="px-1 py-0.5 text-right">{formatCurrency(item.value)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
+                           <Link href="/defaults">Ver todos inadimplentes <ArrowRight className="ml-1 h-3 w-3"/></Link>
                         </Button>
                     </div>
                 </div>
                  <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-success/20 text-success p-2 rounded-full mr-4">
+                    <div className="bg-success/20 text-success p-2 rounded-full mr-4 shrink-0">
                         <Users className="h-5 w-5"/>
                     </div>
-                    <div>
+                    <div className="flex-grow">
                         <h4 className="font-semibold">Engajar Clientes</h4>
                         <p className="text-xs text-muted-foreground">5 novos clientes este mês. Considere uma oferta!</p>
-                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1">
-                            Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/>
+                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
+                            <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
                         </Button>
                     </div>
                 </div>
