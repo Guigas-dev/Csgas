@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, TrendingUp, Info, UserX, Archive } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ArrowRight, TrendingUp, Info, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -66,6 +67,11 @@ const stockPieChartConfig = {
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
   "Capacidade Livre": { label: "Capacidade Livre", color: "hsl(var(--border))" }
 };
+
+// Dummy data for Key Metrics
+const totalCustomers = 35;
+const averageTicket = 185.50;
+const newSalesToday = 5;
 
 
 const formatCurrency = (value: number) =>
@@ -208,6 +214,32 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Métricas Chave */}
+          <Card className="shadow-xl bg-card border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center">
+                <ListChecks className="mr-2 h-5 w-5 text-primary" />
+                Métricas Chave
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground" />Total de Clientes</span>
+                <span className="text-sm font-semibold text-foreground">{totalCustomers}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />Ticket Médio</span>
+                <span className="text-sm font-semibold text-foreground">{formatCurrency(averageTicket)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground flex items-center"><ShoppingCart className="mr-2 h-4 w-4 text-muted-foreground" />Novas Vendas (Hoje)</span>
+                <span className="text-sm font-semibold text-foreground">{newSalesToday}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Coluna Direita */}
@@ -261,7 +293,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {defaultingCustomersData.slice(0, 4).map((item) => (
+                  {defaultingCustomersData.slice(0, 3).map((item) => (
                     <TableRow key={item.customerId}>
                       <TableCell className="font-medium">{item.customerName}</TableCell>
                       <TableCell className="text-destructive">{formatCurrency(item.value)}</TableCell>
