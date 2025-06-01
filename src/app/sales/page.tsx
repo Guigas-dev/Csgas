@@ -60,6 +60,8 @@ const saleStatuses = [
     { value: "Overdue", label: "Atrasado"}
 ];
 
+const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
+
 export default function SalesPage() {
   const [sales, setSales] = useState(initialSales);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -67,9 +69,9 @@ export default function SalesPage() {
   const { toast } = useToast();
   
   const initialFormData = {
-    customerId: '',
+    customerId: '', // Empty string means "Consumidor Final" or placeholder shown
     value: '0',
-    paymentMethod: '',
+    paymentMethod: paymentMethods[0] || '',
     date: new Date(),
     status: 'Paid',
     gasCanistersQuantity: '1',
@@ -81,7 +83,7 @@ export default function SalesPage() {
   useEffect(() => {
     if (isFormOpen && editingSale) {
       setFormData({
-        customerId: editingSale.customerId || '',
+        customerId: editingSale.customerId || '', // If null/undefined, use empty string
         value: String(editingSale.value),
         paymentMethod: editingSale.paymentMethod,
         date: editingSale.date,
@@ -98,13 +100,11 @@ export default function SalesPage() {
 
   const handleAddSale = () => {
     setEditingSale(null);
-    // setFormData(initialFormData); // Moved to useEffect
     setIsFormOpen(true);
   };
 
   const handleEditSale = (sale: typeof initialSales[0]) => {
     setEditingSale(sale);
-    // setFormData({...}); // Moved to useEffect
     setIsFormOpen(true);
   };
 
@@ -115,9 +115,13 @@ export default function SalesPage() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const customer = customers.find(c => c.id === formData.customerId);
+    // If formData.customerId is '', it's "Consumidor Final"
+    const customer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
+    
     const saleData = {
       ...formData,
+      // Store null if customerId was empty (Consumidor Final), otherwise store the ID
+      customerId: formData.customerId || null, 
       customerName: customer ? customer.name : "Consumidor Final",
       value: parseFloat(formData.value) || 0,
       gasCanistersQuantity: parseInt(formData.gasCanistersQuantity) || 0,
@@ -203,20 +207,24 @@ export default function SalesPage() {
         <DialogContent className="sm:max-w-lg bg-card">
           <DialogHeader>
             <DialogTitle className="text-foreground">{editingSale ? "Editar Venda" : "Detalhes da Venda"}</DialogTitle>
-            {!editingSale && <DialogDescription>Preencha os detalhes da nova transação.</DialogDescription>}
-             {editingSale && <DialogDescription>Atualize os detalhes da transação.</DialogDescription>}
+            <DialogDescription>
+              {editingSale ? "Atualize os detalhes da transação." : "Preencha os detalhes da nova transação."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
             <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <div className="flex items-center gap-2">
-                  <Select value={formData.customerId} onValueChange={val => setFormData({...formData, customerId: val})}>
+                  <Select 
+                    value={formData.customerId} 
+                    onValueChange={val => setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? '' : val})}
+                  >
                     <SelectTrigger className="w-full bg-input text-foreground">
                       <SelectValue placeholder="Consumidor Final" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Consumidor Final</SelectItem>
+                      <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
                       {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -332,5 +340,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
