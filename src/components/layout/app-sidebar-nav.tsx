@@ -21,7 +21,6 @@ import {
   CreditCard,
   Archive,
   LogOut,
-  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -85,10 +84,6 @@ export function AppSidebarNav() {
         </SidebarContent>
       </ScrollArea>
       <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border">
-        <Button variant="ghost" className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-          <Settings className="h-5 w-5" />
-          Configurações
-        </Button>
         <Button variant="ghost" className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
           <LogOut className="h-5 w-5" />
           Sair
