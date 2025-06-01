@@ -236,7 +236,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
                 <div className="text-3xl font-bold text-success flex items-center">
-                  <TrendingUp className="mr-2 h-7 w-7" /> +19.23%
+                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
                 </div>
                 <p className="text-xs text-muted-foreground">Atualizado: Hoje, 09:15 AM</p>
               </div>
@@ -308,17 +308,17 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground" />Total de Clientes</span>
+                <span className="text-sm text-muted-foreground flex items-center"><Users className="mr-2 h-4 w-4 text-foreground" />Total de Clientes</span>
                 <span className="text-sm font-semibold text-foreground">{totalCustomers}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />Ticket Médio</span>
+                <span className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4 text-foreground" />Ticket Médio</span>
                 <span className="text-sm font-semibold text-foreground">{formatCurrency(averageTicket)}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center"><ShoppingCart className="mr-2 h-4 w-4 text-muted-foreground" />Novas Vendas (Hoje)</span>
+                <span className="text-sm text-muted-foreground flex items-center"><ShoppingCart className="mr-2 h-4 w-4 text-foreground" />Novas Vendas (Hoje)</span>
                 <span className="text-sm font-semibold text-foreground">{newSalesToday}</span>
               </div>
             </CardContent>
