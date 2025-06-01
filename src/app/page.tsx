@@ -4,8 +4,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
-import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart, UserX } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart, UserX, Archive } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -15,7 +15,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -31,7 +31,7 @@ const salesChartData = [
   { date: "Abr 08", vendas: 4500, mesAnterior: 3900 },
 ];
 
-const chartConfig = {
+const salesBarChartConfig = {
   vendas: {
     label: "Vendas Atuais",
     color: "hsl(var(--chart-1))",
@@ -55,6 +55,18 @@ const defaultingCustomersData = [
   { customerId: "5", customerName: "Julia Santos", value: 85.75, saleId: "s7", dueDate: new Date(2024, 7, 5), paymentStatus: "Pending" },
 ];
 const totalDue = defaultingCustomersData.reduce((sum, item) => sum + item.value, 0);
+
+const currentStock = 75;
+const maxStock = 100;
+const stockChartData = [
+  { name: "Em Estoque", value: currentStock, fill: "hsl(var(--chart-1))" },
+  { name: "Capacidade Livre", value: maxStock - currentStock, fill: "hsl(var(--border))" }
+];
+const stockPieChartConfig = {
+  value: { label: "Unidades" },
+  "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
+  "Capacidade Livre": { label: "Capacidade Livre", color: "hsl(var(--border))" }
+};
 
 
 const formatCurrency = (value: number) =>
@@ -85,7 +97,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[250px] w-full">
-                <ChartContainer config={chartConfig} className="h-full w-full">
+                <ChartContainer config={salesBarChartConfig} className="h-full w-full">
                   <BarChart
                     accessibilityLayer
                     data={salesChartData}
@@ -143,37 +155,58 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Destaques / Oportunidades */}
+          {/* Nível de Estoque */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
-              <CardTitle className="text-xl">Oportunidades</CardTitle>
-              <CardDescription>Ações recomendadas para seu negócio.</CardDescription>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl flex items-center">
+                  <Archive className="mr-2 h-5 w-5 text-primary" />
+                  Nível de Estoque
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                  <Link href="/stock">Ver Detalhes <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                </Button>
+              </div>
+              <CardDescription>Visão geral do seu inventário atual de botijões.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-success/20 text-success p-2 rounded-full mr-4 shrink-0">
-                        <Users className="h-5 w-5"/>
-                    </div>
-                    <div className="flex-grow">
-                        <h4 className="font-semibold">Engajar Clientes</h4>
-                        <p className="text-xs text-muted-foreground">5 novos clientes este mês. Considere uma oferta!</p>
-                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
-                            <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                        </Button>
-                    </div>
-                </div>
-                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-primary/20 text-primary p-2 rounded-full mr-4 shrink-0">
-                        <ShoppingCart className="h-5 w-5"/>
-                    </div>
-                    <div className="flex-grow">
-                        <h4 className="font-semibold">Otimizar Vendas</h4>
-                        <p className="text-xs text-muted-foreground">Analise seus produtos mais vendidos.</p>
-                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
-                            <Link href="/sales">Ver Vendas <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                        </Button>
-                    </div>
-                </div>
+            <CardContent className="flex flex-col md:flex-row items-center gap-6">
+              <div className="h-[180px] w-full md:w-1/2 max-w-[220px] mx-auto">
+                <ChartContainer config={stockPieChartConfig} className="h-full w-full">
+                  <PieChart>
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel nameKey="name" />}
+                    />
+                    <Pie
+                      data={stockChartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      startAngle={90}
+                      endAngle={450}
+                      paddingAngle={2}
+                    >
+                      {stockChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} stroke={entry.fill} />
+                      ))}
+                    </Pie>
+                     <ChartLegend content={<ChartLegendContent nameKey="name" className="text-xs" />} />
+                  </PieChart>
+                </ChartContainer>
+              </div>
+              <div className="text-center md:text-left flex-1">
+                <p className="text-3xl font-bold text-foreground">{currentStock}
+                  <span className="text-xl text-muted-foreground"> / {maxStock}</span>
+                </p>
+                <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
+                <Progress value={(currentStock / maxStock) * 100} className="w-full h-2.5" />
+                 <p className="text-xs text-muted-foreground mt-4">
+                  {((currentStock / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
