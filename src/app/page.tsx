@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart, UserX, Archive } from "lucide-react";
-import Image from "next/image";
+import { ArrowRight, TrendingUp, Info, UserX, Archive } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -15,8 +14,8 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -234,45 +233,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Vendas Recentes */}
-          <Card className="shadow-xl bg-card border-border/30">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xl">Vendas Recentes</CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
-                  <Link href="/sales">Ver Todas <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                </Button>
-              </div>
-              <CardDescription>Últimas transações registradas no sistema.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSalesData.slice(0,4).map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="font-medium">{sale.customerName}</TableCell>
-                      <TableCell>{sale.amount}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
-                          {sale.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
-            </CardContent>
-          </Card>
-
+          
           {/* Clientes Inadimplentes */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
@@ -313,6 +274,43 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Vendas Recentes */}
+          <Card className="shadow-xl bg-card border-border/30">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl">Vendas Recentes</CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                  <Link href="/sales">Ver Todas <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                </Button>
+              </div>
+              <CardDescription>Últimas transações registradas no sistema.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentSalesData.slice(0,4).map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell className="font-medium">{sale.customerName}</TableCell>
+                      <TableCell>{sale.amount}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+                          {sale.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
