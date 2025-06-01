@@ -203,14 +203,14 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickMargin={8}
                       tickFormatter={(value) => value.slice(0, 6)}
-                      stroke="hsl(var(--muted-foreground))"
+                      stroke="hsl(var(--foreground))"
                       fontSize={12}
                     />
                     <YAxis
                       tickLine={false}
                       axisLine={false}
                       tickMargin={8}
-                      stroke="hsl(var(--muted-foreground))"
+                      stroke="hsl(var(--foreground))"
                       fontSize={12}
                       tickFormatter={(value) => `R$${value/1000}k`}
                     />
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                       radius={[4, 4, 0, 0]}
                       barSize={15}
                     />
-                    <ChartLegend content={<ChartLegendContent />} />
+                    <ChartLegend content={<ChartLegendContent className="text-xs text-foreground" />} />
                   </BarChart>
                 </ChartContainer>
               </div>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
                 <div className="text-3xl font-bold text-foreground flex items-center">
                   <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
                 </div>
-                <p className="text-xs text-muted-foreground">Atualizado: Hoje, 09:15 AM</p>
+                <p className="text-xs text-foreground">Atualizado: Hoje, 09:15 AM</p>
               </div>
             </CardContent>
           </Card>
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                         <Cell key={`cell-${index}`} fill={entry.fill} stroke={entry.fill} />
                       ))}
                     </Pie>
-                     <ChartLegend content={<ChartLegendContent nameKey="name" className="text-xs" />} />
+                     <ChartLegend content={<ChartLegendContent nameKey="name" className="text-xs text-foreground" />} />
                   </PieChart>
                 </ChartContainer>
               </div>
