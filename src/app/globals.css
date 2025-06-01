@@ -4,44 +4,49 @@
 
 @layer base {
   :root {
-    --background: 0 0% 10%; /* Darker background like #1A1A1A */
+    --background: 0 0% 7%; /* Even Darker background like #121212 */
     --foreground: 0 0% 87.8%; /* #E0E0E0 */
-    --card: 0 0% 14%; /* Slightly darker card #242424 */
+    --card: 0 0% 10%; /* Darker card like #1A1A1A */
     --card-foreground: 0 0% 87.8%;
-    --popover: 0 0% 12%; /* #1F1F1F */
+    --popover: 0 0% 8%; /* #141414 */
     --popover-foreground: 0 0% 87.8%;
-    --primary: 231 53% 40.6%; /* Dark Blue #303F9F */
-    --primary-foreground: 0 0% 98%; /* Almost white */
+
+    /* Updated Primary and Accent colors for better contrast */
+    --primary: 199 93% 64.1%; /* Light Blue #4FC3F7 (was accent) */
+    --primary-foreground: 0 0% 10%; /* Dark color #1A1A1A (was accent-foreground) */
+    --accent: 199 93% 64.1%; /* Light Blue #4FC3F7 (same as new primary) */
+    --accent-foreground: 0 0% 10%; /* Dark color #1A1A1A (same as new primary-foreground) */
+
     --secondary: 0 0% 22%; /* #383838 */
     --secondary-foreground: 0 0% 90%;
     --muted: 0 0% 22%;
-    --muted-foreground: 0 0% 65%; /* #A6A6A6 - Adjusted for new background */
-    --accent: 199 93% 64.1%; /* Light Blue #4FC3F7 */
-    --accent-foreground: 0 0% 10%; /* Dark color for text on accent #1A1A1A */
-    --destructive: 0 63% 45%; /* #C0392B */
-    --destructive-foreground: 0 0% 98%;
-    --success: 145 63% 37%; /* #27AE60 */
-    --success-foreground: 0 0% 98%;
-    --border: 0 0% 28%; /* #474747 - For general borders */
+    --muted-foreground: 0 0% 70%; /* #B3B3B3 - Adjusted for better contrast */
+    --destructive: 0 84.2% 60.2%; /* Brighter Red #FF5252 */
+    --destructive-foreground: 0 0% 10%; /* Dark text on destructive #1A1A1A */
+    --success: 145 75% 45%; /* Brighter Green #2ECC71 */
+    --success-foreground: 0 0% 10%; /* Dark text on success #1A1A1A */
+    
+    --border: 0 0% 20%; /* #333333 - More subtle border */
     --subtle-border: 0 0% 87.8% / 0.1; /* For glassmorphism border - Foreground with low alpha */
-    --input: 0 0% 20%; /* #333333 */
-    --ring: 199 93% 64.1%; /* Accent color for rings */
-    --chart-1: 199 93% 64.1%; /* Accent - Light Blue */
-    --chart-2: 231 53% 40.6%; /* Primary - Dark Blue */
-    --chart-3: 120 60% 35%; /* Success Green */
+    --input: 0 0% 15%; /* #262626 */
+    --ring: 199 93% 64.1%; /* New primary color for rings (Light Blue) */
+    
+    --chart-1: 199 93% 64.1%; /* New Primary - Light Blue */
+    --chart-2: 231 53% 40.6%; /* Old Primary - Dark Blue (can be a secondary chart color) */
+    --chart-3: 145 75% 45%;   /* Success Green */
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar specific variables */
+    /* Sidebar specific variables - already using light blue as primary */
     --sidebar-background: 0 0% 12%; /* #1F1F1F */
     --sidebar-foreground: 0 0% 80%; /* #CCCCCC */
-    --sidebar-primary: 199 93% 64.1%; /* Accent Light Blue */
-    --sidebar-primary-foreground: 0 0% 10%; /* Dark text for accent */
+    --sidebar-primary: 199 93% 64.1%; /* Light Blue */
+    --sidebar-primary-foreground: 0 0% 10%; /* Dark text for light blue */
     --sidebar-accent: 0 0% 18%; /* #2E2E2E - hover for sidebar items */
     --sidebar-accent-foreground: 0 0% 90%; /* #E5E5E5 */
     --sidebar-border: 0 0% 20%; /* #333333 */
-    --sidebar-ring: 199 93% 64.1%; /* Accent for rings */
+    --sidebar-ring: 199 93% 64.1%; /* Light Blue for rings */
   }
 
 }
