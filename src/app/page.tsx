@@ -235,7 +235,7 @@ export default function DashboardPage() {
                 </ChartContainer>
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
-                <div className="text-3xl font-bold text-success flex items-center">
+                <div className="text-3xl font-bold text-foreground flex items-center">
                   <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
                 </div>
                 <p className="text-xs text-muted-foreground">Atualizado: Hoje, 09:15 AM</p>
@@ -287,11 +287,11 @@ export default function DashboardPage() {
               </div>
               <div className="text-center md:text-left flex-1">
                 <p className="text-3xl font-bold text-foreground">{currentStockForChart}
-                  <span className="text-xl text-muted-foreground"> / {maxStock}</span>
+                  <span className="text-xl text-foreground"> / {maxStock}</span>
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
                 <Progress value={(currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
-                 <p className="text-xs text-muted-foreground mt-4">
+                 <p className="text-xs text-foreground mt-4">
                   {((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
                 </p>
               </div>
