@@ -69,7 +69,7 @@ export function AppSidebarNav() {
                     className={cn(
                       "w-full justify-start",
                       pathname === item.href
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary-hover-bg"
                         : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                     isActive={pathname === item.href}

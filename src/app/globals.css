@@ -12,22 +12,28 @@
     --popover-foreground: 0 0% 87.8%;
 
     /* Updated Primary and Accent colors for better contrast */
-    --primary: 199 93% 64.1%; /* Light Blue #4FC3F7 (was accent) */
+    --primary: 199 93% 64.1%; /* Light Blue #4FC3F7 */
+    --primary-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue #3BB1EE for hover */
     --primary-foreground: 0 0% 10%; /* Dark color #1A1A1A (was accent-foreground) */
+    
     --accent: 199 93% 64.1%; /* Light Blue #4FC3F7 (same as new primary) */
+    --accent-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue #3BB1EE for hover */
     --accent-foreground: 0 0% 10%; /* Dark color #1A1A1A (same as new primary-foreground) */
 
     --secondary: 0 0% 22%; /* #383838 */
     --secondary-foreground: 0 0% 90%;
-    --muted: 0 0% 22%;
-    --muted-foreground: 0 0% 70%; /* #B3B3B3 - Adjusted for better contrast */
+    
+    --muted: 0 0% 22%; /* #383838 */
+    --muted-foreground: 0 0% 75%; /* #BEBEBE - Lighter for better contrast */
+    
     --destructive: 0 84.2% 60.2%; /* Brighter Red #FF5252 */
     --destructive-foreground: 0 0% 10%; /* Dark text on destructive #1A1A1A */
-    --success: 145 75% 45%; /* Brighter Green #2ECC71 */
+    
+    --success: 145 80% 40%; /* #27AE60 - Slightly desaturated green */
     --success-foreground: 0 0% 10%; /* Dark text on success #1A1A1A */
     
-    --border: 0 0% 20%; /* #333333 - More subtle border */
-    --subtle-border: 0 0% 87.8% / 0.1; /* For glassmorphism border - Foreground with low alpha */
+    --border: 0 0% 16%; /* #292929 - Slightly lighter than card for subtle definition */
+    --subtle-border: 0 0% 87.8% / 0.08; /* For glassmorphism border - Foreground with low alpha */
     --input: 0 0% 15%; /* #262626 */
     --ring: 199 93% 64.1%; /* New primary color for rings (Light Blue) */
     
@@ -38,10 +44,11 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar specific variables - already using light blue as primary */
+    /* Sidebar specific variables */
     --sidebar-background: 0 0% 12%; /* #1F1F1F */
     --sidebar-foreground: 0 0% 80%; /* #CCCCCC */
     --sidebar-primary: 199 93% 64.1%; /* Light Blue */
+    --sidebar-primary-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue for hover */
     --sidebar-primary-foreground: 0 0% 10%; /* Dark text for light blue */
     --sidebar-accent: 0 0% 18%; /* #2E2E2E - hover for sidebar items */
     --sidebar-accent-foreground: 0 0% 90%; /* #E5E5E5 */
