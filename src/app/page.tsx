@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart } from "lucide-react";
+import { ArrowRight, Lightbulb, TrendingUp, DollarSign, Users, Info, CalendarDays, ShoppingCart, UserX } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 
 const salesChartData = [
@@ -141,42 +143,37 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Vendas Recentes */}
+          {/* Destaques / Oportunidades */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
-              <CardTitle className="text-xl">Vendas Recentes</CardTitle>
-              <CardDescription>Últimas transações registradas no sistema.</CardDescription>
+              <CardTitle className="text-xl">Oportunidades</CardTitle>
+              <CardDescription>Ações recomendadas para seu negócio.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSalesData.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="font-medium">{sale.customerName}</TableCell>
-                      <TableCell>{sale.amount}</TableCell>
-                      <TableCell>{sale.date}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
-                          {sale.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="hover:bg-accent/50">Detalhes</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
+            <CardContent className="space-y-4">
+                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
+                    <div className="bg-success/20 text-success p-2 rounded-full mr-4 shrink-0">
+                        <Users className="h-5 w-5"/>
+                    </div>
+                    <div className="flex-grow">
+                        <h4 className="font-semibold">Engajar Clientes</h4>
+                        <p className="text-xs text-muted-foreground">5 novos clientes este mês. Considere uma oferta!</p>
+                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
+                            <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                        </Button>
+                    </div>
+                </div>
+                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
+                    <div className="bg-primary/20 text-primary p-2 rounded-full mr-4 shrink-0">
+                        <ShoppingCart className="h-5 w-5"/>
+                    </div>
+                    <div className="flex-grow">
+                        <h4 className="font-semibold">Otimizar Vendas</h4>
+                        <p className="text-xs text-muted-foreground">Analise seus produtos mais vendidos.</p>
+                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
+                            <Link href="/sales">Ver Vendas <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                        </Button>
+                    </div>
+                </div>
             </CardContent>
           </Card>
         </div>
@@ -229,59 +226,84 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Destaques / Oportunidades */}
+          {/* Vendas Recentes */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
-              <CardTitle className="text-xl">Oportunidades</CardTitle>
-              <CardDescription>Ações recomendadas para seu negócio.</CardDescription>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl">Vendas Recentes</CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                  <Link href="/sales">Ver Todas <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                </Button>
+              </div>
+              <CardDescription>Últimas transações registradas no sistema.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-destructive/20 text-destructive p-2 rounded-full mr-4 shrink-0">
-                        <DollarSign className="h-5 w-5"/>
-                    </div>
-                    <div className="flex-grow">
-                        <h4 className="font-semibold">Analisar Inadimplência</h4>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Você tem <strong>{formatCurrency(totalDue)}</strong> em dívidas ativas de {defaultingCustomersData.length} clientes.
-                        </p>
-                        <div className="mb-2 text-xs">
-                          <Table className="text-xs">
-                            <TableHeader>
-                              <TableRow className="border-b-border/30">
-                                <TableHead className="h-auto px-1 py-0.5 text-muted-foreground">Cliente</TableHead>
-                                <TableHead className="h-auto px-1 py-0.5 text-right text-muted-foreground">Valor</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {defaultingCustomersData.slice(0, 3).map((item) => (
-                                <TableRow key={item.customerId} className="border-b-0">
-                                  <TableCell className="px-1 py-0.5 font-medium">{item.customerName}</TableCell>
-                                  <TableCell className="px-1 py-0.5 text-right">{formatCurrency(item.value)}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
-                           <Link href="/defaults">Ver todos inadimplentes <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                        </Button>
-                    </div>
-                </div>
-                 <div className="flex items-start p-4 rounded-lg bg-background hover:bg-accent/10 transition-colors">
-                    <div className="bg-success/20 text-success p-2 rounded-full mr-4 shrink-0">
-                        <Users className="h-5 w-5"/>
-                    </div>
-                    <div className="flex-grow">
-                        <h4 className="font-semibold">Engajar Clientes</h4>
-                        <p className="text-xs text-muted-foreground">5 novos clientes este mês. Considere uma oferta!</p>
-                         <Button variant="link" size="sm" className="p-0 h-auto text-accent hover:text-accent/80 mt-1 text-xs" asChild>
-                            <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                        </Button>
-                    </div>
-                </div>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentSalesData.slice(0,4).map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell className="font-medium">{sale.customerName}</TableCell>
+                      <TableCell>{sale.amount}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+                          {sale.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
             </CardContent>
           </Card>
+
+          {/* Clientes Inadimplentes */}
+          <Card className="shadow-xl bg-card border-border/30">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl flex items-center">
+                  <UserX className="mr-2 h-5 w-5 text-destructive" />
+                  Clientes Inadimplentes
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                  <Link href="/defaults">Ver Todos <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                </Button>
+              </div>
+              <CardDescription>Clientes com pagamentos pendentes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-destructive font-semibold mb-2">
+                Total devido: {formatCurrency(totalDue)}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor Devido</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {defaultingCustomersData.slice(0, 4).map((item) => (
+                    <TableRow key={item.customerId}>
+                      <TableCell className="font-medium">{item.customerName}</TableCell>
+                      <TableCell className="text-destructive">{formatCurrency(item.value)}</TableCell>
+                      <TableCell>{format(item.dueDate, "dd/MM/yy", { locale: ptBR })}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {defaultingCustomersData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhum cliente inadimplente.</p>}
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </div>
