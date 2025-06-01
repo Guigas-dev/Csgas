@@ -1,3 +1,4 @@
+
 "use client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import { BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -74,7 +75,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="h-[250px] w-full">
                 <ChartContainer config={chartConfig} className="h-full w-full">
-                  <AreaChart
+                  <BarChart
                     accessibilityLayer
                     data={salesChartData}
                     margin={{
@@ -106,22 +107,18 @@ export default function DashboardPage() {
                       cursor={false}
                       content={<ChartTooltipContent indicator="dot" />}
                     />
-                    <Area
+                    <Bar
                       dataKey="mesAnterior"
-                      type="natural"
-                      fill="hsl(var(--chart-2)/0.3)"
-                      stroke="hsl(var(--chart-2))"
-                      stackId="a"
+                      fill="hsl(var(--chart-2))"
+                      radius={[4, 4, 0, 0]}
                     />
-                    <Area
+                    <Bar
                       dataKey="vendas"
-                      type="natural"
-                      fill="hsl(var(--chart-1)/0.4)"
-                      stroke="hsl(var(--chart-1))"
-                      stackId="a"
+                      fill="hsl(var(--chart-1))"
+                      radius={[4, 4, 0, 0]}
                     />
                     <ChartLegend content={<ChartLegendContent />} />
-                  </AreaChart>
+                  </BarChart>
                 </ChartContainer>
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
@@ -197,7 +194,7 @@ export default function DashboardPage() {
               {/* AI Assistant */}
               <div className="relative p-6 rounded-lg bg-card/50 backdrop-blur-md border border-[hsl(var(--subtle-border))]">
                  <Image 
-                    src="https://placehold.co/400x250/1A1A1A/4FC3F7.png?text=AI" 
+                    src="https://placehold.co/400x250.png" 
                     alt="AI Assistant Visual" 
                     width={400} 
                     height={250} 
@@ -258,3 +255,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
