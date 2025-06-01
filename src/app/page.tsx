@@ -1,12 +1,13 @@
 
 "use client";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, TrendingUp, Info, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart } from "lucide-react";
+import { ArrowRight, TrendingUp, Info, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -68,7 +69,6 @@ const stockPieChartConfig = {
   "Capacidade Livre": { label: "Capacidade Livre", color: "hsl(var(--border))" }
 };
 
-// Dummy data for Key Metrics
 const totalCustomers = 35;
 const averageTicket = 185.50;
 const newSalesToday = 5;
@@ -77,10 +77,90 @@ const newSalesToday = 5;
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+interface KpiCardProps {
+  title: string;
+  value: string | number;
+  subText?: string;
+  icon: React.ReactNode;
+  trendIcon?: React.ReactNode;
+  valueColor?: string;
+  subTextColor?: string;
+  isLoading?: boolean;
+}
+
+const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIcon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
+  return (
+    <Card className="shadow-lg bg-card border-border/30">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+           <div className="text-2xl font-bold text-foreground">Carregando...</div>
+        ) : (
+          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && title.toLowerCase().includes("vendas totais") ? formatCurrency(value) : value}</div>
+        )}
+        {subText && !isLoading && (
+          <p className={`text-xs ${subTextColor} flex items-center`}>
+            {subText} {trendIcon && <span className="ml-1">{trendIcon}</span>}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+
 export default function DashboardPage() {
+  const [stockCount, setStockCount] = useState<number | null>(null);
+  const [isLoadingStock, setIsLoadingStock] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStockCount(75); 
+      setIsLoadingStock(false);
+    }, 1500); 
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="container mx-auto">
       <PageHeader title="Dashboard" description="Visão geral do seu negócio." />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard
+          title="Vendas Totais (Mês)"
+          value={12345}
+          subText="+15% Mês Anterior"
+          icon={<DollarSign className="h-5 w-5 text-primary" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
+          valueColor="text-primary"
+        />
+        <KpiCard
+          title="Vendas Pagas (Mês)"
+          value={85}
+          subText="+5 Mês Anterior"
+          icon={<CheckCircle2 className="h-5 w-5 text-success" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
+          valueColor="text-success"
+        />
+        <KpiCard
+          title="Vendas Pendentes"
+          value={12}
+          subText={formatCurrency(1250.00)}
+          icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
+          valueColor="text-destructive"
+          subTextColor="text-destructive"
+        />
+        <KpiCard
+          title="Botijões em Estoque"
+          value={stockCount ?? ""}
+          icon={<PackageSearch className="h-5 w-5 text-primary" />}
+          isLoading={isLoadingStock}
+          valueColor="text-foreground"
+        />
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna Esquerda */}
@@ -244,28 +324,6 @@ export default function DashboardPage() {
 
         {/* Coluna Direita */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Saldo Total de Vendas */}
-          <Card className="shadow-xl bg-card border-border/30 overflow-hidden">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-xl">Saldo Total de Vendas</CardTitle>
-                  <CardDescription className="text-sm">Soma de todas as vendas.</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary/10">USD $</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-primary my-4">{formatCurrency(23094.57)}</div>
-              <div className="flex justify-between items-center text-xs text-muted-foreground mb-6">
-                <span>Comparado ao mês passado: <span className="text-destructive">-37.16%</span></span>
-                <span className="flex items-center cursor-pointer hover:text-accent">
-                  Como funciona? <Info className="ml-1 h-3 w-3"/>
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-          
           {/* Clientes Inadimplentes */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
@@ -348,4 +406,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
