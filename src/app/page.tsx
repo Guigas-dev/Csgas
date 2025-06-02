@@ -137,16 +137,18 @@ export default function DashboardPage() {
           value={12345}
           subText="+15% Mês Anterior"
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
+          subTextColor="text-success"
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
           value={85}
           subText="+5 Mês Anterior"
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-foreground" />}
+          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
+          subTextColor="text-success"
         />
         <KpiCard
           title="Vendas Pendentes"
