@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   SidebarHeader,
   SidebarContent,
@@ -21,6 +21,7 @@ import {
   CreditCard,
   Archive,
   LogOut,
+  UsersCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,10 +45,18 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
+  { href: "/users", label: "Usuários", icon: UsersCog },
 ];
 
 export function AppSidebarNav() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Here you would typically clear any session/token
+    // For now, just redirect to login
+    router.push('/login');
+  };
 
   return (
     <>
@@ -84,7 +93,11 @@ export function AppSidebarNav() {
         </SidebarContent>
       </ScrollArea>
       <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border">
-        <Button variant="ghost" className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <Button 
+          variant="ghost" 
+          onClick={handleLogout}
+          className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
           <LogOut className="h-5 w-5" />
           Sair
         </Button>
