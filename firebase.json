@@ -33,8 +33,7 @@
         "node_modules",
         ".git",
         "firebase-debug.log",
-        "firebase-debug.*.log",
-        "app_next/**/node_modules/**"
+        "firebase-debug.*.log"
       ],
       "runtime": "nodejs20",
       "memory": "512MB"
