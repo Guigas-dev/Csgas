@@ -1,16 +1,12 @@
 {
   "hosting": {
-    "public": ".next/standalone/public",
+    "public": "build_output",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
     "rewrites": [
-      {
-        "source": "/_next/static/**",
-        "destination": "/_next/static/**"
-      },
       {
         "source": "/_next/image/**",
         "function": {
