@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Roboto', 'sans-serif'],
-        headline: ['Roboto', 'sans-serif'],
+        body: ['"Plus Jakarta Sans"', 'sans-serif'],
+        headline: ['"Plus Jakarta Sans"', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
