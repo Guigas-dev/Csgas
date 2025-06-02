@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -20,6 +21,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 
 const salesChartData = [
@@ -95,7 +97,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         {isLoading ? (
            <div className="text-2xl font-bold text-foreground">Carregando...</div>
         ) : (
-          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes") || title.toLowerCase().includes("preço")) ? formatCurrency(value) : value}</div>
+          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes") ) ? formatCurrency(value) : value}</div>
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
@@ -111,6 +113,15 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
 export default function DashboardPage() {
   const [stockCount, setStockCount] = useState<number | null>(null);
   const [isLoadingStock, setIsLoadingStock] = useState(true);
+  const { toast } = useToast();
+
+  const [gasPrices, setGasPrices] = useState({
+    current: 115.00,
+    cash: 110.00,
+    card: 118.00,
+  });
+  const [editedPrices, setEditedPrices] = useState(gasPrices);
+  const [isEditingPrices, setIsEditingPrices] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -119,6 +130,29 @@ export default function DashboardPage() {
     }, 1500); 
     return () => clearTimeout(timer);
   }, []);
+
+  const handleEditPrices = () => {
+    setEditedPrices(gasPrices);
+    setIsEditingPrices(true);
+  };
+
+  const handleSavePrices = () => {
+    setGasPrices(editedPrices);
+    setIsEditingPrices(false);
+    toast({
+      title: "Preços Atualizados!",
+      description: "Os preços do gás foram salvos com sucesso.",
+    });
+  };
+
+  const handleCancelEditPrices = () => {
+    setIsEditingPrices(false);
+  };
+
+  const handlePriceInputChange = (key: keyof typeof gasPrices, value: string) => {
+    setEditedPrices(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
+  };
+
 
   const currentStockForChart = stockCount ?? 0;
   const stockChartData = [
@@ -152,8 +186,8 @@ export default function DashboardPage() {
         />
         <KpiCard
           title="Vendas Pendentes"
-          value={1250.00} 
-          subText="12 Pendentes"
+          value={defaultingCustomersData.length > 0 ? defaultingCustomersData.reduce((acc, item) => acc + item.value, 0) : 0}
+          subText={`${defaultingCustomersData.length} Pendentes`}
           icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
           valueColor="text-foreground" 
           subTextColor="text-destructive"
@@ -167,32 +201,85 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <KpiCard
-          title="Preço do Gás (Atual)"
-          value={115.00}
-          subText="Botijão P13"
-          icon={<Flame className="h-5 w-5 text-foreground" />}
-          valueColor="text-foreground"
-          subTextColor="text-muted-foreground"
-        />
-        <KpiCard
-          title="Preço à Vista"
-          value={110.00}
-          subText="Desconto de R$ 5,00"
-          icon={<Banknote className="h-5 w-5 text-foreground" />}
-          valueColor="text-foreground"
-          subTextColor="text-success"
-        />
-        <KpiCard
-          title="Preço no Cartão"
-          value={118.00}
-          subText="Débito ou Crédito"
-          icon={<CreditCard className="h-5 w-5 text-foreground" />}
-          valueColor="text-foreground"
-          subTextColor="text-muted-foreground"
-        />
-      </div>
+      <Card className="shadow-lg bg-card border-border/30 mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center">
+            <Flame className="mr-2 h-5 w-5 text-foreground" /> Preços do Gás
+          </CardTitle>
+          {!isEditingPrices && (
+            <Button onClick={handleEditPrices} variant="ghost" size="sm">
+              <Edit className="mr-2 h-4 w-4" /> Editar
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <Flame className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Atual</span>
+              </div>
+              {isEditingPrices ? (
+                <Input 
+                  type="number" 
+                  value={editedPrices.current} 
+                  onChange={(e) => handlePriceInputChange('current', e.target.value)} 
+                  className="bg-input text-foreground text-xl font-bold p-2 h-auto"
+                />
+              ) : (
+                <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-0.5">Botijão P13</p>
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <Banknote className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">À Vista</span>
+              </div>
+              {isEditingPrices ? (
+                <Input 
+                  type="number" 
+                  value={editedPrices.cash} 
+                  onChange={(e) => handlePriceInputChange('cash', e.target.value)}
+                  className="bg-input text-foreground text-xl font-bold p-2 h-auto"
+                />
+              ) : (
+                <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.cash)}</p>
+              )}
+              <p className="text-xs text-success mt-0.5">
+                Desconto de {formatCurrency(gasPrices.current - gasPrices.cash)}
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Cartão</span>
+              </div>
+              {isEditingPrices ? (
+                <Input 
+                  type="number" 
+                  value={editedPrices.card} 
+                  onChange={(e) => handlePriceInputChange('card', e.target.value)}
+                  className="bg-input text-foreground text-xl font-bold p-2 h-auto"
+                />
+              ) : (
+                <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.card)}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-0.5">Débito ou Crédito</p>
+            </div>
+          </div>
+          {isEditingPrices && (
+            <div className="mt-6 flex justify-end gap-2">
+              <Button onClick={handleCancelEditPrices} variant="outline">Cancelar</Button>
+              <Button onClick={handleSavePrices}>
+                <Check className="mr-2 h-4 w-4" /> Salvar Alterações
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna Esquerda */}
@@ -438,4 +525,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
