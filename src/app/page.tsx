@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -95,7 +95,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         {isLoading ? (
            <div className="text-2xl font-bold text-foreground">Carregando...</div>
         ) : (
-          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes")) ? formatCurrency(value) : value}</div>
+          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes") || title.toLowerCase().includes("preço")) ? formatCurrency(value) : value}</div>
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
@@ -166,6 +166,33 @@ export default function DashboardPage() {
           valueColor="text-foreground"
         />
       </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <KpiCard
+          title="Preço do Gás (Atual)"
+          value={115.00}
+          subText="Botijão P13"
+          icon={<Flame className="h-5 w-5 text-foreground" />}
+          valueColor="text-foreground"
+          subTextColor="text-muted-foreground"
+        />
+        <KpiCard
+          title="Preço à Vista"
+          value={110.00}
+          subText="Desconto de R$ 5,00"
+          icon={<Banknote className="h-5 w-5 text-foreground" />}
+          valueColor="text-foreground"
+          subTextColor="text-success"
+        />
+        <KpiCard
+          title="Preço no Cartão"
+          value={118.00}
+          subText="Débito ou Crédito"
+          icon={<CreditCard className="h-5 w-5 text-foreground" />}
+          valueColor="text-foreground"
+          subTextColor="text-muted-foreground"
+        />
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna Esquerda */}
@@ -174,7 +201,7 @@ export default function DashboardPage() {
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-xl">Visão Geral de Vendas</CardTitle>
+                <CardTitle className="text-xl text-foreground">Visão Geral de Vendas</CardTitle>
                 <Tabs defaultValue="month" className="w-auto">
                   <TabsList className="bg-background border border-input">
                     <TabsTrigger value="24h" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">24h</TabsTrigger>
@@ -249,7 +276,7 @@ export default function DashboardPage() {
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-xl flex items-center">
+                <CardTitle className="text-xl flex items-center text-foreground">
                   <Archive className="mr-2 h-5 w-5 text-foreground" />
                   Nível de Estoque
                 </CardTitle>
@@ -303,7 +330,7 @@ export default function DashboardPage() {
           {/* Métricas Chave */}
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center">
+              <CardTitle className="text-xl flex items-center text-foreground">
                 <ListChecks className="mr-2 h-5 w-5 text-foreground" />
                 Métricas Chave
               </CardTitle>
@@ -333,7 +360,7 @@ export default function DashboardPage() {
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-xl flex items-center">
+                <CardTitle className="text-xl flex items-center text-foreground">
                   <UserX className="mr-2 h-5 w-5 text-foreground" />
                   Clientes Inadimplentes
                 </CardTitle>
@@ -373,7 +400,7 @@ export default function DashboardPage() {
           <Card className="shadow-xl bg-card border-border/30">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-xl">Vendas Recentes</CardTitle>
+                <CardTitle className="text-xl text-foreground">Vendas Recentes</CardTitle>
                 <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
                   <Link href="/sales">Ver Todas <ArrowRight className="ml-1 h-3 w-3"/></Link>
                 </Button>
