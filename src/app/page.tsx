@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO, getISOWeek, getYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -29,15 +29,6 @@ import type { DefaultEntry } from "./defaults/actions";
 import type { Sale } from "./sales/actions"; // Import Sale type
 import type { Customer } from "./customers/actions"; // Import Customer type
 
-const salesChartData = [ // Placeholder, can be made dynamic later
-  { date: "Mar 01", vendas: 2800, mesAnterior: 2400 },
-  { date: "Mar 08", vendas: 2500, mesAnterior: 2700 },
-  { date: "Mar 15", vendas: 3200, mesAnterior: 2900 },
-  { date: "Mar 22", vendas: 3500, mesAnterior: 3100 },
-  { date: "Mar 29", vendas: 4100, mesAnterior: 3300 },
-  { date: "Abr 05", vendas: 3800, mesAnterior: 3700 },
-  { date: "Abr 08", vendas: 4500, mesAnterior: 3900 },
-];
 
 const salesBarChartConfig = {
   vendas: {
@@ -50,7 +41,7 @@ const salesBarChartConfig = {
   },
 };
 
-const maxStock = 100; 
+const maxStock = 100;
 const stockPieChartConfig = {
   value: { label: "Unidades" },
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
@@ -131,6 +122,12 @@ export default function DashboardPage() {
   const [isLoadingSalesKpi, setIsLoadingSalesKpi] = useState(true);
   const [isLoadingCustomersKpi, setIsLoadingCustomersKpi] = useState(true);
   const [isLoadingRecentSales, setIsLoadingRecentSales] = useState(true);
+  const [dynamicSalesChartData, setDynamicSalesChartData] = useState<any[]>([]);
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setLastUpdatedTime(new Date());
+  }, []);
 
 
   useEffect(() => {
@@ -189,7 +186,7 @@ export default function DashboardPage() {
           } as Sale;
         });
 
-        setRecentSales(salesData.slice(0, 4)); // Get top 4 recent sales for the table
+        setRecentSales(salesData.slice(0, 4));
 
         const now = new Date();
         const firstDayOfMonth = startOfMonth(now);
@@ -200,22 +197,34 @@ export default function DashboardPage() {
         let currentMonthSalesCount = 0;
         let todaySalesCount = 0;
 
+        const weeklySalesData: { [week: string]: { weekLabel: string, vendas: number, mesAnterior: number } } = {};
+        const currentYear = getYear(now);
+
         salesData.forEach(sale => {
-          const saleDate = sale.date; // Already a Date object
+          const saleDate = sale.date;
           
-          // Sales of the current month
           if (isWithinInterval(saleDate, { start: firstDayOfMonth, end: lastDayOfMonth })) {
             currentMonthSalesValue += sale.value;
             currentMonthSalesCount++;
             if (sale.status === "Paid") {
               currentMonthPaidSalesCount++;
             }
+
+            const weekNumber = getISOWeek(saleDate);
+            const weekKey = `${currentYear}-W${weekNumber}`;
+            if (!weeklySalesData[weekKey]) {
+              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0, mesAnterior: 2000 }; // Placeholder for mesAnterior
+            }
+            weeklySalesData[weekKey].vendas += sale.value;
           }
-          // Sales of today
           if (isToday(saleDate)) {
             todaySalesCount++;
           }
         });
+        
+        const chartDataFormatted = Object.values(weeklySalesData).sort((a,b) => a.weekLabel.localeCompare(b.weekLabel));
+        setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ date: format(now, "MMM dd"), vendas: 0, mesAnterior: 0 }]);
+
 
         setTotalSalesMonth(currentMonthSalesValue);
         setPaidSalesMonthCount(currentMonthPaidSalesCount);
@@ -289,7 +298,7 @@ export default function DashboardPage() {
         <KpiCard
           title="Vendas Totais (Mês)"
           value={totalSalesMonth}
-          subText="+15% Mês Anterior" // Placeholder trend
+          subText="+15% Mês Anterior" 
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
@@ -299,7 +308,7 @@ export default function DashboardPage() {
         <KpiCard
           title="Vendas Pagas (Mês)"
           value={paidSalesMonthCount}
-          subText="+5 Mês Anterior" // Placeholder trend
+          subText="+5 Mês Anterior" 
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
@@ -429,10 +438,15 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[250px] w-full">
+                {isLoadingSalesKpi ? (
+                  <div className="flex justify-center items-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
                 <ChartContainer config={salesBarChartConfig} className="h-full w-full">
                   <BarChart
                     accessibilityLayer
-                    data={salesChartData} // Placeholder data
+                    data={dynamicSalesChartData}
                     margin={{
                       left: -20,
                       right: 10,
@@ -442,11 +456,10 @@ export default function DashboardPage() {
                   >
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border)/0.5)" />
                     <XAxis
-                      dataKey="date"
+                      dataKey="weekLabel"
                       tickLine={false}
                       axisLine={false}
                       tickMargin={8}
-                      tickFormatter={(value) => value.slice(0, 6)}
                       stroke="hsl(var(--foreground))"
                       fontSize={12}
                     />
@@ -477,12 +490,17 @@ export default function DashboardPage() {
                     <ChartLegend content={<ChartLegendContent className="text-xs text-foreground" />} />
                   </BarChart>
                 </ChartContainer>
+                )}
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
                 <div className="text-3xl font-bold text-foreground flex items-center">
                   <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23% {/* Placeholder */}
                 </div>
-                <p className="text-xs text-foreground">Atualizado: {format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                {lastUpdatedTime ? (
+                  <p className="text-xs text-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Carregando hora...</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -684,6 +702,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
