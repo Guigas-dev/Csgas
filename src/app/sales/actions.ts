@@ -33,9 +33,15 @@ export async function addSale(formData: SaleFormData): Promise<{ success: boolea
     revalidatePath('/sales');
     revalidatePath('/'); // For dashboard recent sales
     return { success: true, id: docRef.id };
-  } catch (error: any) {
-    console.error('Error adding sale:', error);
-    return { success: false, error: error.message || 'Falha ao registrar venda.' };
+  } catch (e: unknown) {
+    console.error('Error adding sale:', e);
+    let errorMessage = 'Falha ao registrar venda.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -50,9 +56,15 @@ export async function updateSale(id: string, formData: SaleFormData): Promise<{ 
     revalidatePath('/sales');
     revalidatePath('/'); // For dashboard recent sales
     return { success: true };
-  } catch (error: any) {
-    console.error('Error updating sale:', error);
-    return { success: false, error: error.message || 'Falha ao atualizar venda.' };
+  } catch (e: unknown) {
+    console.error('Error updating sale:', e);
+    let errorMessage = 'Falha ao atualizar venda.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -63,8 +75,14 @@ export async function deleteSale(id: string): Promise<{ success: boolean; error?
     revalidatePath('/sales');
     revalidatePath('/'); // For dashboard recent sales
     return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting sale:', error);
-    return { success: false, error: error.message || 'Falha ao excluir venda.' };
+  } catch (e: unknown) {
+    console.error('Error deleting sale:', e);
+    let errorMessage = 'Falha ao excluir venda.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }

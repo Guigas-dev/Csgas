@@ -24,9 +24,15 @@ export async function addCustomer(formData: CustomerFormData): Promise<{ success
     });
     revalidatePath('/customers');
     return { success: true };
-  } catch (error: any) {
-    console.error('Error adding customer:', error);
-    return { success: false, error: error.message || 'Falha ao adicionar cliente.' };
+  } catch (e: unknown) {
+    console.error('Error adding customer:', e);
+    let errorMessage = 'Falha ao adicionar cliente.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -39,9 +45,15 @@ export async function updateCustomer(id: string, formData: CustomerFormData): Pr
     });
     revalidatePath('/customers');
     return { success: true };
-  } catch (error: any) {
-    console.error('Error updating customer:', error);
-    return { success: false, error: error.message || 'Falha ao atualizar cliente.' };
+  } catch (e: unknown) {
+    console.error('Error updating customer:', e);
+    let errorMessage = 'Falha ao atualizar cliente.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -51,8 +63,14 @@ export async function deleteCustomer(id: string): Promise<{ success: boolean; er
     await deleteDoc(customerRef);
     revalidatePath('/customers');
     return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting customer:', error);
-    return { success: false, error: error.message || 'Falha ao excluir cliente.' };
+  } catch (e: unknown) {
+    console.error('Error deleting customer:', e);
+    let errorMessage = 'Falha ao excluir cliente.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }

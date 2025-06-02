@@ -26,10 +26,16 @@ export async function addStockMovement(formData: StockMovementFormData): Promise
     });
     revalidatePath('/stock');
     // Consider revalidating '/' if the dashboard stock count needs to be updated from this data.
-    // revalidatePath('/'); 
+    revalidatePath('/'); 
     return { success: true, id: docRef.id };
-  } catch (error: any) {
-    console.error('Error adding stock movement:', error);
-    return { success: false, error: error.message || 'Falha ao registrar movimentação de estoque.' };
+  } catch (e: unknown) {
+    console.error('Error adding stock movement:', e);
+    let errorMessage = 'Falha ao registrar movimentação de estoque.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }

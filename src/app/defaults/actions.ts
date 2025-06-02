@@ -30,9 +30,15 @@ export async function addDefault(formData: DefaultFormData): Promise<{ success: 
     revalidatePath('/defaults');
     revalidatePath('/'); // For dashboard defaults
     return { success: true, id: docRef.id };
-  } catch (error: any) {
-    console.error('Error adding default:', error);
-    return { success: false, error: error.message || 'Falha ao adicionar pendência.' };
+  } catch (e: unknown) {
+    console.error('Error adding default:', e);
+    let errorMessage = 'Falha ao adicionar pendência.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -47,9 +53,15 @@ export async function updateDefault(id: string, formData: Partial<DefaultFormDat
     revalidatePath('/defaults');
     revalidatePath('/'); // For dashboard defaults
     return { success: true };
-  } catch (error: any) {
-    console.error('Error updating default:', error);
-    return { success: false, error: error.message || 'Falha ao atualizar pendência.' };
+  } catch (e: unknown) {
+    console.error('Error updating default:', e);
+    let errorMessage = 'Falha ao atualizar pendência.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -60,9 +72,15 @@ export async function deleteDefault(id: string): Promise<{ success: boolean; err
     revalidatePath('/defaults');
     revalidatePath('/'); // For dashboard defaults
     return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting default:', error);
-    return { success: false, error: error.message || 'Falha ao excluir pendência.' };
+  } catch (e: unknown) {
+    console.error('Error deleting default:', e);
+    let errorMessage = 'Falha ao excluir pendência.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -76,8 +94,14 @@ export async function markDefaultAsPaid(id: string): Promise<{ success: boolean;
     revalidatePath('/defaults');
     revalidatePath('/'); // For dashboard defaults
     return { success: true };
-  } catch (error: any) {
-    console.error('Error marking default as paid:', error);
-    return { success: false, error: error.message || 'Falha ao marcar como pago.' };
+  } catch (e: unknown) {
+    console.error('Error marking default as paid:', e);
+    let errorMessage = 'Falha ao marcar como pago.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    }
+    return { success: false, error: errorMessage };
   }
 }
