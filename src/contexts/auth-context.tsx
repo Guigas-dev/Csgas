@@ -11,7 +11,8 @@ import {
   signOut 
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+// Loader2 is no longer used directly here for a global loader
+// import { Loader2 } from 'lucide-react'; 
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -51,7 +52,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setLoading(false);
+      // No need to setLoading(false) here if onAuthStateChanged handles currentUser update
+      // which might trigger re-renders. However, for immediate feedback on the sign-in action itself:
+      setLoading(false); 
       return { success: true };
     } catch (error) {
       setLoading(false);
@@ -63,28 +66,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signOut(auth);
-      // No need to setCurrentUser(null) here, onAuthStateChanged will handle it
-      router.push('/login'); // Redirect to login after sign out
+      // onAuthStateChanged will set currentUser to null and loading to false.
+      // Router push can be handled by AppSidebarNav or pages listening to auth state.
+      router.push('/login'); 
     } catch (error) {
       console.error("Error signing out: ", error);
       // Handle sign out error if necessary, e.g., show a toast
     } finally {
-      setLoading(false);
+      // setLoading(false) will be handled by onAuthStateChanged effectively
+      // but if there's an error and onAuthStateChanged doesn't fire as expected,
+      // this ensures loading state is reset.
+      setLoading(false); 
     }
   };
   
-  if (loading && !currentUser && typeof window !== 'undefined' && window.location.pathname !== '/login') {
-    // Show a global loader only if not on login page and still initially loading auth state
-    // This helps prevent flicker for protected routes.
-    const isLoginPage = window.location.pathname === '/login';
-    if (!isLoginPage) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
-    }
-  }
+  // Removed the problematic client-side only global loader block.
+  // The AppSidebarNav and LoginPage components handle their own loading/redirect logic.
+  // if (loading && !currentUser && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+  //   const isLoginPage = window.location.pathname === '/login';
+  //   if (!isLoginPage) {
+  //       return (
+  //           <div className="flex items-center justify-center min-h-screen bg-background">
+  //               <Loader2 className="h-12 w-12 animate-spin text-primary" />
+  //           </div>
+  //       );
+  //   }
+  // }
 
 
   const value = {
@@ -96,3 +103,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
