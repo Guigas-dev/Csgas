@@ -43,12 +43,7 @@ import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import type { Sale, SaleFormData } from "./actions";
 import { addSale, updateSale, deleteSale } from "./actions";
-
-// Dummy customers data for now. TODO: Fetch from Firestore
-const customers = [
-  { id: "1", name: "João Silva" },
-  { id: "2", name: "Maria Oliveira" },
-];
+import type { Customer } from "../customers/actions"; // Import Customer type
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
@@ -61,6 +56,8 @@ const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]); // State for Firestore customers
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +65,7 @@ export default function SalesPage() {
   const { toast } = useToast();
   
   const initialFormData: SaleFormData = {
-    customerId: null, // Null means "Consumidor Final"
+    customerId: null, 
     customerName: "Consumidor Final",
     value: 0,
     paymentMethod: paymentMethods[0] || '',
@@ -92,7 +89,7 @@ export default function SalesPage() {
             id: doc.id,
             ...data,
             date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-            createdAt: data.createdAt, // Keep as Timestamp or convert as needed
+            createdAt: data.createdAt, 
           } as Sale;
         });
         setSales(salesData);
@@ -107,7 +104,28 @@ export default function SalesPage() {
         setIsLoading(false);
       }
     };
+
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true);
+      try {
+        const q = query(collection(db, "customers"), orderBy("name", "asc"));
+        const querySnapshot = await getDocs(q);
+        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        setCustomers(customersData);
+      } catch (error) {
+        console.error("Error fetching customers: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar clientes",
+          description: "Não foi possível carregar a lista de clientes para o formulário.",
+        });
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
     fetchSales();
+    fetchCustomers();
   }, [toast]);
 
   useEffect(() => {
@@ -119,7 +137,7 @@ export default function SalesPage() {
           customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
           value: editingSale.value,
           paymentMethod: editingSale.paymentMethod,
-          date: editingSale.date instanceof Date ? editingSale.date : new Date(editingSale.date), // Ensure it's a Date object
+          date: editingSale.date instanceof Date ? editingSale.date : new Date(editingSale.date),
           status: editingSale.status,
           gasCanistersQuantity: editingSale.gasCanistersQuantity,
           observations: editingSale.observations || '',
@@ -129,18 +147,17 @@ export default function SalesPage() {
         setFormData(initialFormData);
       }
     }
-  }, [isFormOpen, editingSale]);
+  }, [isFormOpen, editingSale, customers]);
 
 
   const handleAddSale = () => {
     setEditingSale(null);
-    setFormData(initialFormData); // Reset with correct customerName for Consumidor Final
+    setFormData(initialFormData); 
     setIsFormOpen(true);
   };
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    // FormData will be set by the useEffect hook based on editingSale
     setIsFormOpen(true);
   };
 
@@ -150,7 +167,7 @@ export default function SalesPage() {
     const result = await deleteSale(id);
     if (result.success) {
       toast({ title: "Venda Removida!", description: "O registro da venda foi removido com sucesso." });
-      setSales(prev => prev.filter(s => s.id !== id)); // Optimistic update
+      setSales(prev => prev.filter(s => s.id !== id)); 
     } else {
       toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
     }
@@ -161,11 +178,11 @@ export default function SalesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    const customer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
+    const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     const salePayload: SaleFormData = {
       ...formData,
       customerId: formData.customerId || null,
-      customerName: customer ? customer.name : "Consumidor Final",
+      customerName: selectedCustomer ? selectedCustomer.name : "Consumidor Final",
       value: parseFloat(String(formData.value)) || 0,
       gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
     };
@@ -185,9 +202,7 @@ export default function SalesPage() {
 
     if (result.success) {
       setIsFormOpen(false);
-      // Re-fetch or optimistic update - revalidatePath handles actual data refresh
-      // For now, just close form, data will be refetched via useEffect if toast changes or page reloads
-      // To see immediate changes, we'd need to manually trigger fetch or update state optimistically more deeply
+      // Data will be re-fetched by revalidatePath
     } else {
       toast({ variant: "destructive", title: "Erro ao salvar", description: result.error });
     }
@@ -279,11 +294,14 @@ export default function SalesPage() {
                 <div className="flex items-center gap-2">
                   <Select 
                     value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE} 
-                    onValueChange={val => setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : customers.find(c => c.id === val)?.name || ""})}
-                    disabled={isSubmitting}
+                    onValueChange={val => {
+                        const selectedCust = customers.find(c => c.id === val);
+                        setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
+                    }}
+                    disabled={isSubmitting || isLoadingCustomers}
                   >
                     <SelectTrigger className="w-full bg-input text-foreground">
-                      <SelectValue placeholder="Consumidor Final" />
+                      <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>

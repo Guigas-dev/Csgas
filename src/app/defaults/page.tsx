@@ -41,18 +41,16 @@ import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import type { DefaultEntry, DefaultFormData } from "./actions";
 import { addDefault, updateDefault, deleteDefault, markDefaultAsPaid } from "./actions";
-
-// Dummy customers data for now. TODO: Fetch from Firestore
-const customers = [
-  { id: "1", name: "João Silva" },
-  { id: "2", name: "Maria Oliveira" },
-  { id: "4", name: "Pedro Almeida" },
-];
+import type { Customer } from "../customers/actions"; // Import Customer type
 
 const paymentStatuses = ["Pending", "Paid"];
+const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
+
 
 export default function DefaultsPage() {
   const [defaults, setDefaults] = useState<DefaultEntry[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]); // State for Firestore customers
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDefault, setEditingDefault] = useState<DefaultEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,8 +58,8 @@ export default function DefaultsPage() {
   const { toast } = useToast();
   
   const initialFormData: DefaultFormData = {
-    customerId: '',
-    customerName: '',
+    customerId: null, // Null means "Consumidor Final"
+    customerName: 'Consumidor Final',
     value: 0,
     dueDate: new Date(),
     paymentStatus: 'Pending',
@@ -96,7 +94,28 @@ export default function DefaultsPage() {
         setIsLoading(false);
       }
     };
+
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true);
+      try {
+        const q = query(collection(db, "customers"), orderBy("name", "asc"));
+        const querySnapshot = await getDocs(q);
+        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        setCustomers(customersData);
+      } catch (error) {
+        console.error("Error fetching customers: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar clientes",
+          description: "Não foi possível carregar a lista de clientes para o formulário.",
+        });
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
     fetchDefaults();
+    fetchCustomers();
   }, [toast]);
 
   useEffect(() => {
@@ -104,8 +123,8 @@ export default function DefaultsPage() {
       if (editingDefault) {
         const customer = customers.find(c => c.id === editingDefault.customerId);
         setFormData({
-          customerId: editingDefault.customerId || '',
-          customerName: editingDefault.customerName || (editingDefault.customerId ? (customer?.name || "Cliente não encontrado") : ""),
+          customerId: editingDefault.customerId || null,
+          customerName: editingDefault.customerName || (editingDefault.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
           value: editingDefault.value,
           dueDate: editingDefault.dueDate instanceof Date ? editingDefault.dueDate : new Date(editingDefault.dueDate),
           paymentStatus: editingDefault.paymentStatus,
@@ -115,7 +134,7 @@ export default function DefaultsPage() {
         setFormData(initialFormData);
       }
     }
-  }, [isFormOpen, editingDefault]);
+  }, [isFormOpen, editingDefault, customers]);
 
   const handleAddDefault = () => {
     setEditingDefault(null);
@@ -125,7 +144,6 @@ export default function DefaultsPage() {
 
   const handleEditDefault = (defaultItem: DefaultEntry) => {
     setEditingDefault(defaultItem);
-    // FormData will be set by the useEffect hook
     setIsFormOpen(true);
   };
 
@@ -134,9 +152,7 @@ export default function DefaultsPage() {
     const result = await markDefaultAsPaid(id);
     if (result.success) {
         toast({ title: "Pendência Paga!", description: "O status da pendência foi atualizado para pago."});
-        setDefaults(prev => 
-          prev.map(d => d.id === id ? { ...d, paymentStatus: "Paid" } : d) // Optimistic update
-        );
+        // Re-fetch or optimistic update needed
     } else {
         toast({ variant: "destructive", title: "Erro ao atualizar", description: result.error });
     }
@@ -149,7 +165,7 @@ export default function DefaultsPage() {
     const result = await deleteDefault(id);
     if (result.success) {
       toast({ title: "Pendência excluída!", description: "O registro foi removido com sucesso." });
-      setDefaults(prev => prev.filter(d => d.id !== id)); // Optimistic update
+      // Re-fetch or optimistic update needed
     } else {
       toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
     }
@@ -160,10 +176,11 @@ export default function DefaultsPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const customer = customers.find(c => c.id === formData.customerId);
+    const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     const defaultPayload: DefaultFormData = {
       ...formData,
-      customerName: customer ? customer.name : (formData.customerId === '' ? "Consumidor Não Identificado" : "Cliente não encontrado"), // Handle if no customerId but name was typed
+      customerId: formData.customerId || null,
+      customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === null ? "Consumidor Final" : "Cliente não encontrado"),
       value: parseFloat(String(formData.value)) || 0,
     };
     
@@ -182,7 +199,7 @@ export default function DefaultsPage() {
 
     if (result.success) {
       setIsFormOpen(false);
-      // Data will be re-fetched or rely on optimistic update for now
+      // Data will be re-fetched by revalidatePath
     } else {
       toast({ variant: "destructive", title: "Erro ao salvar", description: result.error });
     }
@@ -276,15 +293,18 @@ export default function DefaultsPage() {
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <Select 
-                    value={formData.customerId || ""} 
-                    onValueChange={val => setFormData({...formData, customerId: val, customerName: customers.find(c => c.id === val)?.name || ""})}
-                    disabled={isSubmitting}
+                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE} 
+                    onValueChange={val => {
+                        const selectedCust = customers.find(c => c.id === val);
+                        setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
+                    }}
+                    disabled={isSubmitting || isLoadingCustomers}
                 >
                   <SelectTrigger className="w-full bg-input text-foreground">
-                    <SelectValue placeholder="Selecione o cliente" />
+                    <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
                   </SelectTrigger>
                   <SelectContent>
-                     <SelectItem value="">Consumidor Não Identificado</SelectItem>
+                     <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
                     {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

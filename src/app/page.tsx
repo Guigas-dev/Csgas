@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -22,7 +22,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-
+import { db } from "@/lib/firebase/config";
+import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import type { StockMovementEntry } from "./stock/actions";
+import type { DefaultEntry } from "./defaults/actions"; // Assuming DefaultEntry is exported
 
 const salesChartData = [
   { date: "Mar 01", vendas: 2800, mesAnterior: 2400 },
@@ -52,24 +55,16 @@ const recentSalesData = [
   { id: "4", customerName: "Mariana Costa", amount: "R$ 310,00", date: "06/04/2024", status: "Pago" },
 ];
 
-const defaultingCustomersData = [
-  { customerId: "2", customerName: "Maria Oliveira", value: 241.00, saleId: "s2", dueDate: new Date(2024, 7, 14), paymentStatus: "Pending" },
-  { customerId: "4", customerName: "Pedro Almeida", value: 150.00, saleId: "s4", dueDate: new Date(2024, 6, 30), paymentStatus: "Pending" },
-  { customerId: "5", customerName: "Julia Santos", value: 85.75, saleId: "s7", dueDate: new Date(2024, 7, 5), paymentStatus: "Pending" },
-];
-const totalDue = defaultingCustomersData.reduce((sum, item) => sum + item.value, 0);
-
-
-const maxStock = 100;
+const maxStock = 100; // Can be made dynamic later if needed
 const stockPieChartConfig = {
   value: { label: "Unidades" },
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
   "Capacidade Livre": { label: "Capacidade Livre", color: "hsl(var(--border))" }
 };
 
-const totalCustomers = 35;
-const averageTicket = 185.50;
-const newSalesToday = 5;
+const totalCustomers = 35; // TODO: Fetch from Firestore
+const averageTicket = 185.50; // TODO: Calculate from sales
+const newSalesToday = 5; // TODO: Calculate from sales
 
 
 const formatCurrency = (value: number) =>
@@ -87,6 +82,12 @@ interface KpiCardProps {
 }
 
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIcon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
+  const shouldFormatCurrency = typeof value === 'number' &&
+    (title.toLowerCase().includes("vendas totais") ||
+     title.toLowerCase().includes("ticket médio") ||
+     title.toLowerCase().includes("vendas pendentes") ||
+     title.toLowerCase().includes("preço"));
+
   return (
     <Card className="shadow-lg bg-card border-border/30">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -97,7 +98,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         {isLoading ? (
            <div className="text-2xl font-bold text-foreground">Carregando...</div>
         ) : (
-          <div className={`text-2xl font-bold ${valueColor}`}>{typeof value === 'number' && (title.toLowerCase().includes("vendas totais") || title.toLowerCase().includes("ticket médio") || title.toLowerCase().includes("vendas pendentes") ) ? formatCurrency(value) : value}</div>
+          <div className={`text-2xl font-bold ${valueColor}`}>{shouldFormatCurrency ? formatCurrency(value as number) : value}</div>
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
@@ -111,8 +112,10 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
 
 
 export default function DashboardPage() {
-  const [stockCount, setStockCount] = useState<number | null>(null);
+  const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null);
   const [isLoadingStock, setIsLoadingStock] = useState(true);
+  const [defaultingCustomers, setDefaultingCustomers] = useState<DefaultEntry[]>([]);
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
   const { toast } = useToast();
 
   const [gasPrices, setGasPrices] = useState({
@@ -124,12 +127,57 @@ export default function DashboardPage() {
   const [isEditingPrices, setIsEditingPrices] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setStockCount(75); 
-      setIsLoadingStock(false);
-    }, 1500); 
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchStockMovements = async () => {
+      setIsLoadingStock(true);
+      try {
+        const q = query(collection(db, "stockMovements"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        const movementsData = querySnapshot.docs.map(doc => doc.data() as StockMovementEntry);
+        const stockLevel = movementsData.reduce((acc, mov) => {
+          return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
+        }, 0);
+        setCurrentStockLevel(stockLevel);
+      } catch (error) {
+        console.error("Error fetching stock movements: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar estoque",
+          description: "Não foi possível carregar o nível de estoque.",
+        });
+      } finally {
+        setIsLoadingStock(false);
+      }
+    };
+
+    const fetchDefaults = async () => {
+      setIsLoadingDefaults(true);
+      try {
+        const q = query(collection(db, "defaults"), orderBy("dueDate", "asc")); // Order by due date
+        const querySnapshot = await getDocs(q);
+        const defaultsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
+          } as DefaultEntry;
+        }).filter(d => d.paymentStatus === "Pending"); // Filter for pending defaults
+        setDefaultingCustomers(defaultsData);
+      } catch (error) {
+        console.error("Error fetching defaults: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar inadimplências",
+          description: "Não foi possível carregar a lista de inadimplências.",
+        });
+      } finally {
+        setIsLoadingDefaults(false);
+      }
+    };
+
+    fetchStockMovements();
+    fetchDefaults();
+  }, [toast]);
 
   const handleEditPrices = () => {
     setEditedPrices(gasPrices);
@@ -137,6 +185,7 @@ export default function DashboardPage() {
   };
 
   const handleSavePrices = () => {
+    // TODO: Persist prices, e.g., to Firestore in a 'settings' collection
     setGasPrices(editedPrices);
     setIsEditingPrices(false);
     toast({
@@ -153,13 +202,13 @@ export default function DashboardPage() {
     setEditedPrices(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
   };
 
-
-  const currentStockForChart = stockCount ?? 0;
+  const currentStockForChart = currentStockLevel ?? 0;
   const stockChartData = [
     { name: "Em Estoque", value: currentStockForChart, fill: "hsl(var(--chart-1))" },
-    { name: "Capacidade Livre", value: maxStock - currentStockForChart, fill: "hsl(var(--border))" }
+    { name: "Capacidade Livre", value: Math.max(0, maxStock - currentStockForChart), fill: "hsl(var(--border))" }
   ];
-
+  
+  const totalDueFromDefaults = defaultingCustomers.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <div className="container mx-auto">
@@ -168,7 +217,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
           title="Vendas Totais (Mês)"
-          value={12345}
+          value={12345} // Placeholder
           subText="+15% Mês Anterior"
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
@@ -177,7 +226,7 @@ export default function DashboardPage() {
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
-          value={85}
+          value={85} // Placeholder
           subText="+5 Mês Anterior"
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
@@ -186,15 +235,16 @@ export default function DashboardPage() {
         />
         <KpiCard
           title="Vendas Pendentes"
-          value={defaultingCustomersData.length > 0 ? defaultingCustomersData.reduce((acc, item) => acc + item.value, 0) : 0}
-          subText={`${defaultingCustomersData.length} Pendentes`}
+          value={isLoadingDefaults ? 0 : totalDueFromDefaults}
+          subText={isLoadingDefaults ? "Carregando..." : `${defaultingCustomers.length} Pendentes`}
           icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
           valueColor="text-foreground" 
           subTextColor="text-destructive"
+          isLoading={isLoadingDefaults}
         />
         <KpiCard
           title="Botijões em Estoque"
-          value={stockCount ?? ""}
+          value={currentStockLevel ?? ""}
           icon={<PackageSearch className="h-5 w-5 text-foreground" />}
           isLoading={isLoadingStock}
           valueColor="text-foreground"
@@ -291,9 +341,9 @@ export default function DashboardPage() {
                 <CardTitle className="text-xl text-foreground">Visão Geral de Vendas</CardTitle>
                 <Tabs defaultValue="month" className="w-auto">
                   <TabsList className="bg-background border border-input">
-                    <TabsTrigger value="24h" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">24h</TabsTrigger>
-                    <TabsTrigger value="week" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Semana</TabsTrigger>
-                    <TabsTrigger value="month" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Mês</TabsTrigger>
+                    <TabsTrigger value="24h" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary text-foreground">24h</TabsTrigger>
+                    <TabsTrigger value="week" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary text-foreground">Semana</TabsTrigger>
+                    <TabsTrigger value="month" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary text-foreground">Mês</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -374,6 +424,11 @@ export default function DashboardPage() {
               <CardDescription>Visão geral do seu inventário atual de botijões.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col md:flex-row items-center gap-6">
+             {isLoadingStock ? (
+                <div className="flex justify-center items-center w-full md:w-1/2 py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
               <div className="h-[180px] w-full md:w-1/2 max-w-[220px] mx-auto">
                 <ChartContainer config={stockPieChartConfig} className="h-full w-full">
                   <PieChart>
@@ -401,14 +456,19 @@ export default function DashboardPage() {
                   </PieChart>
                 </ChartContainer>
               </div>
+              )}
               <div className="text-center md:text-left flex-1">
+               {isLoadingStock ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto md:mx-0 mb-2" />
+                ) : (
                 <p className="text-3xl font-bold text-foreground">{currentStockForChart}
                   <span className="text-xl text-foreground"> / {maxStock}</span>
                 </p>
+                )}
                 <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
-                <Progress value={(currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
+                <Progress value={isLoadingStock ? 0 : (currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
                  <p className="text-xs text-foreground mt-4">
-                  {((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
+                  {isLoadingStock ? "Calculando..." : `${((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.`}
                 </p>
               </div>
             </CardContent>
@@ -458,28 +518,37 @@ export default function DashboardPage() {
               <CardDescription>Clientes com pagamentos pendentes.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-destructive font-semibold mb-2">
-                Total devido: {formatCurrency(totalDue)}
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor Devido</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {defaultingCustomersData.slice(0, 3).map((item) => (
-                    <TableRow key={item.customerId}>
-                      <TableCell className="font-medium">{item.customerName}</TableCell>
-                      <TableCell className="text-destructive">{formatCurrency(item.value)}</TableCell>
-                      <TableCell>{format(item.dueDate, "dd/MM/yy", { locale: ptBR })}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {defaultingCustomersData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhum cliente inadimplente.</p>}
+              {isLoadingDefaults ? (
+                <div className="flex justify-center items-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm text-destructive font-semibold mb-2">
+                    Total devido: {formatCurrency(totalDueFromDefaults)}
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-foreground">Cliente</TableHead>
+                        <TableHead className="text-foreground">Valor Devido</TableHead>
+                        <TableHead className="text-foreground">Vencimento</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {defaultingCustomers.slice(0, 3).map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium text-card-foreground">{item.customerName}</TableCell>
+                          <TableCell className="text-destructive">{formatCurrency(item.value)}</TableCell>
+                          <TableCell className="text-card-foreground">{format(item.dueDate, "dd/MM/yy", { locale: ptBR })}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {defaultingCustomers.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhum cliente inadimplente.</p>}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -498,16 +567,16 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-foreground">Cliente</TableHead>
+                    <TableHead className="text-foreground">Valor</TableHead>
+                    <TableHead className="text-foreground">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentSalesData.slice(0,4).map((sale) => (
+                  {recentSalesData.slice(0,4).map((sale) => ( // Placeholder data
                     <TableRow key={sale.id}>
-                      <TableCell className="font-medium">{sale.customerName}</TableCell>
-                      <TableCell>{sale.amount}</TableCell>
+                      <TableCell className="font-medium text-card-foreground">{sale.customerName}</TableCell>
+                      <TableCell className="text-card-foreground">{sale.amount}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
                           {sale.status}
