@@ -9,7 +9,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:firebase": "npm run build && rm -rf functions/app_next && mkdir -p functions/app_next && cp -r .next/standalone/* functions/app_next/ && cp -r .next/static functions/app_next/.next/static && cp -r public functions/app_next/",
+    "deploy:firebase": "npm run build:firebase && firebase deploy"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
