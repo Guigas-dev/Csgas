@@ -63,14 +63,14 @@ export default function LoginPage() {
         switch (result.error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential':
+          case 'auth/invalid-credential': // Covers both user-not-found and wrong-password in newer SDKs
             errorMessage = "Email ou senha inválidos.";
             break;
           case 'auth/invalid-email':
             errorMessage = "O formato do email é inválido.";
             break;
           default:
-            errorMessage = "Ocorreu um erro ao tentar fazer login.";
+            errorMessage = `Ocorreu um erro ao tentar fazer login. ${result.error?.message ? `Detalhe: ${result.error.message}` : ''}`;
             break;
         }
       }
