@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone', // Add this line
+  // output: 'standalone', // Removido para Vercel
 };
 
 export default nextConfig;
