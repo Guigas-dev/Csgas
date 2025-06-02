@@ -21,7 +21,7 @@ import {
   CreditCard,
   Archive,
   LogOut,
-  UsersCog,
+  UserCog, // Corrected from UsersCog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
-  { href: "/users", label: "Usuários", icon: UsersCog },
+  { href: "/users", label: "Usuários", icon: UserCog }, // Corrected from UsersCog
 ];
 
 export function AppSidebarNav() {
