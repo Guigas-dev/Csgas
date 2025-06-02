@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react"; // Import useEffect
 import {
   SidebarHeader,
   SidebarContent,
@@ -21,9 +22,11 @@ import {
   CreditCard,
   Archive,
   LogOut,
-  UserCog, // Corrected from UsersCog
+  UserCog,
+  Loader2, // Import Loader2 for loading state
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
 const VendaFacilLogo = () => (
   <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary">
@@ -45,18 +48,46 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
-  { href: "/users", label: "Usuários", icon: UserCog }, // Corrected from UsersCog
+  { href: "/users", label: "Usuários", icon: UserCog },
 ];
 
 export function AppSidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { currentUser, loading, signOutUser } = useAuth(); // Use auth context
 
-  const handleLogout = () => {
-    // Here you would typically clear any session/token
-    // For now, just redirect to login
-    router.push('/login');
+  useEffect(() => {
+    // If auth is not loading and there's no user, redirect to login.
+    // This effect also runs when `currentUser` changes.
+    // Ensure this doesn't run on the login page itself by checking pathname.
+    if (!loading && !currentUser && pathname !== '/login') {
+      router.push('/login');
+    }
+  }, [currentUser, loading, router, pathname]);
+
+
+  const handleLogout = async () => {
+    await signOutUser();
+    // router.push('/login') is handled by signOutUser or the useEffect above
   };
+
+  // If auth is loading and there's no user yet, show a loading state for the sidebar
+  // or prevent rendering its content to avoid flashes of content.
+  // This could be a more sophisticated skeleton loader.
+  if (loading && !currentUser && pathname !== '/login') {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-4 bg-sidebar text-sidebar-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-2 text-sm">Carregando...</p>
+      </div>
+    );
+  }
+  
+  // Do not render sidebar on login page or if user is not authenticated and still loading
+  if (pathname === '/login' || (!currentUser && loading)) {
+      return null; 
+  }
+
 
   return (
     <>
@@ -97,8 +128,9 @@ export function AppSidebarNav() {
           variant="ghost" 
           onClick={handleLogout}
           className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          disabled={loading} // Disable while any auth operation is in progress
         >
-          <LogOut className="h-5 w-5" />
+          {loading && !currentUser ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
           Sair
         </Button>
       </SidebarFooter>

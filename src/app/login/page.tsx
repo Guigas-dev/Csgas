@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
 const VendaFacilLogoFull = () => (
   <div className="flex items-center justify-center mb-6">
@@ -31,33 +32,64 @@ const VendaFacilLogoFull = () => (
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [email, setEmail] = useState("admin@vendafacil.com"); // Default for convenience
-  const [password, setPassword] = useState("password"); // Default for convenience
+  const { currentUser, signInWithEmail, loading: authLoading } = useAuth(); // Use auth context
+  const [email, setEmail] = useState("admin@vendafacil.com");
+  const [password, setPassword] = useState("password");
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      router.push("/"); // Redirect if already logged in
+    }
+  }, [currentUser, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    // Mock authentication
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    setIsSubmitting(true);
+    
+    const result = await signInWithEmail(email, password);
 
-    if (email === "admin@vendafacil.com" && password === "password") {
+    if (result.success) {
       toast({
         title: "Login bem-sucedido!",
         description: "Redirecionando para o dashboard...",
       });
-      router.push("/"); // Redirect to dashboard
+      router.push("/"); 
     } else {
+      let errorMessage = "Email ou senha inválidos.";
+      if (result.error) {
+        switch (result.error.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+            errorMessage = "Email ou senha inválidos.";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "O formato do email é inválido.";
+            break;
+          default:
+            errorMessage = "Ocorreu um erro ao tentar fazer login.";
+            break;
+        }
+      }
       toast({
         variant: "destructive",
         title: "Erro de login",
-        description: "Email ou senha inválidos.",
+        description: errorMessage,
       });
     }
+    setIsSubmitting(false);
   };
+
+  if (authLoading || currentUser) { // Show loader if auth is loading or user is logged in (and redirecting)
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md shadow-xl bg-card border-border/30">
@@ -78,6 +110,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="bg-input text-foreground"
+              disabled={isSubmitting}
             />
           </div>
           <div className="space-y-2">
@@ -96,8 +129,9 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="bg-input text-foreground pr-10"
+                disabled={isSubmitting}
               />
-              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground" onClick={() => setShowPassword(!showPassword)}>
+              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground" onClick={() => setShowPassword(!showPassword)} disabled={isSubmitting}>
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
@@ -108,12 +142,13 @@ export default function LoginPage() {
                 id="remember-me" 
                 checked={rememberMe} 
                 onCheckedChange={(checked) => setRememberMe(!!checked)}
+                disabled={isSubmitting}
               />
               <Label htmlFor="remember-me" className="text-sm font-normal text-muted-foreground">Lembrar-me</Label>
             </div>
           </div>
-          <Button type="submit" className="w-full bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Entrar"}
+          <Button type="submit" className="w-full bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting || authLoading}>
+            {isSubmitting || authLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Entrar"}
           </Button>
         </form>
       </CardContent>
