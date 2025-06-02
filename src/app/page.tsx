@@ -19,15 +19,17 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, Timestamp, limit as firestoreLimit } from "firebase/firestore";
 import type { StockMovementEntry } from "./stock/actions";
-import type { DefaultEntry } from "./defaults/actions"; // Assuming DefaultEntry is exported
+import type { DefaultEntry } from "./defaults/actions";
+import type { Sale } from "./sales/actions"; // Import Sale type
+import type { Customer } from "./customers/actions"; // Import Customer type
 
-const salesChartData = [
+const salesChartData = [ // Placeholder, can be made dynamic later
   { date: "Mar 01", vendas: 2800, mesAnterior: 2400 },
   { date: "Mar 08", vendas: 2500, mesAnterior: 2700 },
   { date: "Mar 15", vendas: 3200, mesAnterior: 2900 },
@@ -48,31 +50,21 @@ const salesBarChartConfig = {
   },
 };
 
-const recentSalesData = [
-  { id: "1", customerName: "Carlos Lima", amount: "R$ 150,00", date: "08/04/2024", status: "Pago" },
-  { id: "2", customerName: "Ana Pereira", amount: "R$ 230,50", date: "07/04/2024", status: "Pendente" },
-  { id: "3", customerName: "Lucas Souza", amount: "R$ 99,00", date: "07/04/2024", status: "Pago" },
-  { id: "4", customerName: "Mariana Costa", amount: "R$ 310,00", date: "06/04/2024", status: "Pago" },
-];
-
-const maxStock = 100; // Can be made dynamic later if needed
+const maxStock = 100; 
 const stockPieChartConfig = {
   value: { label: "Unidades" },
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
   "Capacidade Livre": { label: "Capacidade Livre", color: "hsl(var(--border))" }
 };
 
-const totalCustomers = 35; // TODO: Fetch from Firestore
-const averageTicket = 185.50; // TODO: Calculate from sales
-const newSalesToday = 5; // TODO: Calculate from sales
-
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatCurrency = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return "R$ 0,00";
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 interface KpiCardProps {
   title: string;
-  value: string | number;
+  value: string | number | null | undefined;
   subText?: string;
   icon: React.ReactNode;
   trendIcon?: React.ReactNode;
@@ -96,7 +88,9 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
       </CardHeader>
       <CardContent>
         {isLoading ? (
-           <div className="text-2xl font-bold text-foreground">Carregando...</div>
+           <div className="text-2xl font-bold text-foreground flex items-center">
+             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando...
+           </div>
         ) : (
           <div className={`text-2xl font-bold ${valueColor}`}>{shouldFormatCurrency ? formatCurrency(value as number) : value}</div>
         )}
@@ -126,6 +120,19 @@ export default function DashboardPage() {
   const [editedPrices, setEditedPrices] = useState(gasPrices);
   const [isEditingPrices, setIsEditingPrices] = useState(false);
 
+  // State for dynamic KPIs
+  const [totalSalesMonth, setTotalSalesMonth] = useState<number | null>(null);
+  const [paidSalesMonthCount, setPaidSalesMonthCount] = useState<number | null>(null);
+  const [averageTicketMonth, setAverageTicketMonth] = useState<number | null>(null);
+  const [newSalesTodayCount, setNewSalesTodayCount] = useState<number | null>(null);
+  const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+
+  const [isLoadingSalesKpi, setIsLoadingSalesKpi] = useState(true);
+  const [isLoadingCustomersKpi, setIsLoadingCustomersKpi] = useState(true);
+  const [isLoadingRecentSales, setIsLoadingRecentSales] = useState(true);
+
+
   useEffect(() => {
     const fetchStockMovements = async () => {
       setIsLoadingStock(true);
@@ -139,11 +146,7 @@ export default function DashboardPage() {
         setCurrentStockLevel(stockLevel);
       } catch (error) {
         console.error("Error fetching stock movements: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar estoque",
-          description: "Não foi possível carregar o nível de estoque.",
-        });
+        toast({ variant: "destructive", title: "Erro ao buscar estoque", description: "Não foi possível carregar o nível de estoque." });
       } finally {
         setIsLoadingStock(false);
       }
@@ -152,7 +155,7 @@ export default function DashboardPage() {
     const fetchDefaults = async () => {
       setIsLoadingDefaults(true);
       try {
-        const q = query(collection(db, "defaults"), orderBy("dueDate", "asc")); // Order by due date
+        const q = query(collection(db, "defaults"), orderBy("dueDate", "asc"));
         const querySnapshot = await getDocs(q);
         const defaultsData = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -161,22 +164,90 @@ export default function DashboardPage() {
             ...data,
             dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
           } as DefaultEntry;
-        }).filter(d => d.paymentStatus === "Pending"); // Filter for pending defaults
+        }).filter(d => d.paymentStatus === "Pending");
         setDefaultingCustomers(defaultsData);
       } catch (error) {
         console.error("Error fetching defaults: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar inadimplências",
-          description: "Não foi possível carregar a lista de inadimplências.",
-        });
+        toast({ variant: "destructive", title: "Erro ao buscar inadimplências", description: "Não foi possível carregar a lista de inadimplências." });
       } finally {
         setIsLoadingDefaults(false);
       }
     };
 
+    const fetchSalesData = async () => {
+      setIsLoadingSalesKpi(true);
+      setIsLoadingRecentSales(true);
+      try {
+        const salesQuery = query(collection(db, "sales"), orderBy("date", "desc"));
+        const querySnapshot = await getDocs(salesQuery);
+        const salesData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
+          } as Sale;
+        });
+
+        setRecentSales(salesData.slice(0, 4)); // Get top 4 recent sales for the table
+
+        const now = new Date();
+        const firstDayOfMonth = startOfMonth(now);
+        const lastDayOfMonth = endOfMonth(now);
+
+        let currentMonthSalesValue = 0;
+        let currentMonthPaidSalesCount = 0;
+        let currentMonthSalesCount = 0;
+        let todaySalesCount = 0;
+
+        salesData.forEach(sale => {
+          const saleDate = sale.date; // Already a Date object
+          
+          // Sales of the current month
+          if (isWithinInterval(saleDate, { start: firstDayOfMonth, end: lastDayOfMonth })) {
+            currentMonthSalesValue += sale.value;
+            currentMonthSalesCount++;
+            if (sale.status === "Paid") {
+              currentMonthPaidSalesCount++;
+            }
+          }
+          // Sales of today
+          if (isToday(saleDate)) {
+            todaySalesCount++;
+          }
+        });
+
+        setTotalSalesMonth(currentMonthSalesValue);
+        setPaidSalesMonthCount(currentMonthPaidSalesCount);
+        setNewSalesTodayCount(todaySalesCount);
+        setAverageTicketMonth(currentMonthSalesCount > 0 ? currentMonthSalesValue / currentMonthSalesCount : 0);
+
+      } catch (error) {
+        console.error("Error fetching sales data for KPIs: ", error);
+        toast({ variant: "destructive", title: "Erro ao buscar dados de vendas", description: "Não foi possível carregar os KPIs de vendas." });
+      } finally {
+        setIsLoadingSalesKpi(false);
+        setIsLoadingRecentSales(false);
+      }
+    };
+
+    const fetchCustomerCount = async () => {
+      setIsLoadingCustomersKpi(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, "customers"));
+        setTotalCustomersCount(querySnapshot.size);
+      } catch (error) {
+        console.error("Error fetching customer count: ", error);
+        toast({ variant: "destructive", title: "Erro ao buscar clientes", description: "Não foi possível carregar o total de clientes."});
+      } finally {
+        setIsLoadingCustomersKpi(false);
+      }
+    };
+
     fetchStockMovements();
     fetchDefaults();
+    fetchSalesData();
+    fetchCustomerCount();
   }, [toast]);
 
   const handleEditPrices = () => {
@@ -217,25 +288,27 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
           title="Vendas Totais (Mês)"
-          value={12345} // Placeholder
-          subText="+15% Mês Anterior"
+          value={totalSalesMonth}
+          subText="+15% Mês Anterior" // Placeholder trend
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
           subTextColor="text-success"
+          isLoading={isLoadingSalesKpi}
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
-          value={85} // Placeholder
-          subText="+5 Mês Anterior"
+          value={paidSalesMonthCount}
+          subText="+5 Mês Anterior" // Placeholder trend
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
           trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
           subTextColor="text-success"
+          isLoading={isLoadingSalesKpi}
         />
         <KpiCard
           title="Vendas Pendentes"
-          value={isLoadingDefaults ? 0 : totalDueFromDefaults}
+          value={totalDueFromDefaults}
           subText={isLoadingDefaults ? "Carregando..." : `${defaultingCustomers.length} Pendentes`}
           icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
           valueColor="text-foreground" 
@@ -244,7 +317,7 @@ export default function DashboardPage() {
         />
         <KpiCard
           title="Botijões em Estoque"
-          value={currentStockLevel ?? ""}
+          value={currentStockLevel}
           icon={<PackageSearch className="h-5 w-5 text-foreground" />}
           isLoading={isLoadingStock}
           valueColor="text-foreground"
@@ -297,8 +370,13 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.cash)}</p>
               )}
-              <p className="text-xs text-success mt-0.5">
-                Desconto de {formatCurrency(gasPrices.current - gasPrices.cash)}
+               <p className="text-xs text-success mt-0.5">
+                {isEditingPrices && editedPrices.current > editedPrices.cash 
+                  ? `Desconto de ${formatCurrency(editedPrices.current - editedPrices.cash)}`
+                  : !isEditingPrices && gasPrices.current > gasPrices.cash
+                  ? `Desconto de ${formatCurrency(gasPrices.current - gasPrices.cash)}`
+                  : " " 
+                }
               </p>
             </div>
 
@@ -354,7 +432,7 @@ export default function DashboardPage() {
                 <ChartContainer config={salesBarChartConfig} className="h-full w-full">
                   <BarChart
                     accessibilityLayer
-                    data={salesChartData}
+                    data={salesChartData} // Placeholder data
                     margin={{
                       left: -20,
                       right: 10,
@@ -402,9 +480,9 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
                 <div className="text-3xl font-bold text-foreground flex items-center">
-                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
+                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23% {/* Placeholder */}
                 </div>
-                <p className="text-xs text-foreground">Atualizado: Hoje, 09:15 AM</p>
+                <p className="text-xs text-foreground">Atualizado: {format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
               </div>
             </CardContent>
           </Card>
@@ -459,17 +537,22 @@ export default function DashboardPage() {
               )}
               <div className="text-center md:text-left flex-1">
                {isLoadingStock ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto md:mx-0 mb-2" />
+                  <div className="flex flex-col items-center md:items-start">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                  </div>
                 ) : (
-                <p className="text-3xl font-bold text-foreground">{currentStockForChart}
-                  <span className="text-xl text-foreground"> / {maxStock}</span>
-                </p>
+                  <>
+                    <p className="text-3xl font-bold text-foreground">{currentStockForChart}
+                      <span className="text-xl text-foreground"> / {maxStock}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
+                    <Progress value={(currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
+                    <p className="text-xs text-foreground mt-4">
+                      {((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
+                    </p>
+                  </>
                 )}
-                <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
-                <Progress value={isLoadingStock ? 0 : (currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
-                 <p className="text-xs text-foreground mt-4">
-                  {isLoadingStock ? "Calculando..." : `${((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.`}
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -485,17 +568,17 @@ export default function DashboardPage() {
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground flex items-center"><Users className="mr-2 h-4 w-4 text-foreground" />Total de Clientes</span>
-                <span className="text-sm font-semibold text-foreground">{totalCustomers}</span>
+                {isLoadingCustomersKpi ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <span className="text-sm font-semibold text-foreground">{totalCustomersCount ?? 0}</span>}
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4 text-foreground" />Ticket Médio</span>
-                <span className="text-sm font-semibold text-foreground">{formatCurrency(averageTicket)}</span>
+                <span className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4 text-foreground" />Ticket Médio (Mês)</span>
+                 {isLoadingSalesKpi ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <span className="text-sm font-semibold text-foreground">{formatCurrency(averageTicketMonth)}</span>}
               </div>
               <Separator />
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground flex items-center"><ShoppingCart className="mr-2 h-4 w-4 text-foreground" />Novas Vendas (Hoje)</span>
-                <span className="text-sm font-semibold text-foreground">{newSalesToday}</span>
+                 {isLoadingSalesKpi ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <span className="text-sm font-semibold text-foreground">{newSalesTodayCount ?? 0}</span>}
               </div>
             </CardContent>
           </Card>
@@ -564,29 +647,36 @@ export default function DashboardPage() {
               <CardDescription>Últimas transações registradas no sistema.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-foreground">Cliente</TableHead>
-                    <TableHead className="text-foreground">Valor</TableHead>
-                    <TableHead className="text-foreground">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSalesData.slice(0,4).map((sale) => ( // Placeholder data
-                    <TableRow key={sale.id}>
-                      <TableCell className="font-medium text-card-foreground">{sale.customerName}</TableCell>
-                      <TableCell className="text-card-foreground">{sale.amount}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Pago" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
-                          {sale.status}
-                        </span>
-                      </TableCell>
+              {isLoadingRecentSales ? (
+                <div className="flex justify-center items-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando...</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-foreground">Cliente</TableHead>
+                      <TableHead className="text-foreground">Valor</TableHead>
+                      <TableHead className="text-foreground">Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-               {recentSalesData.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
+                  </TableHeader>
+                  <TableBody>
+                    {recentSales.map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell className="font-medium text-card-foreground">{sale.customerName || "Consumidor Final"}</TableCell>
+                        <TableCell className="text-card-foreground">{formatCurrency(sale.value)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 text-xs rounded-full ${sale.status === "Paid" ? "bg-success/20 text-success" : sale.status === "Pending" ? "bg-destructive/20 text-destructive" : "bg-muted/50 text-muted-foreground"}`}>
+                            {sale.status === "Paid" ? "Pago" : sale.status === "Pending" ? "Pendente" : sale.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {!isLoadingRecentSales && recentSales.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda recente.</p>}
             </CardContent>
           </Card>
         </div>
@@ -594,3 +684,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
