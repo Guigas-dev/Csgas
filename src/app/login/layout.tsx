@@ -13,13 +13,12 @@ export default function LoginLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The RootLayout (src/app/layout.tsx) handles the main HTML structure (<html>, <head>, <body>).
-  // Font links and global styles are also handled there.
-  // This layout should only provide the specific structure for the login page.
+  // This layout component should only return the specific JSX for the login page's wrapper,
+  // NOT the full <html>, <head>, <body> structure, as RootLayout (src/app/layout.tsx) handles that.
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-background text-foreground font-body antialiased">
       {children}
-      <Toaster />
+      <Toaster /> {/* This Toaster can be specific to the login layout if needed, RootLayout may also have one */}
     </div>
   );
 }
