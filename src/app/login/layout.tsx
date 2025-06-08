@@ -13,9 +13,9 @@ export default function LoginLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Removed <html>, <head>, and <body> tags.
-  // The RootLayout (src/app/layout.tsx) handles the main HTML structure.
-  // Font links are also handled in RootLayout.
+  // The RootLayout (src/app/layout.tsx) handles the main HTML structure (<html>, <head>, <body>).
+  // Font links and global styles are also handled there.
+  // This layout should only provide the specific structure for the login page.
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-background text-foreground font-body antialiased">
       {children}
