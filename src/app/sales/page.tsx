@@ -97,7 +97,7 @@ export default function SalesPage() {
 
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
-    customerName: "Consumidor Final", // Default for quick sale, can be overridden
+    customerName: "Consumidor Final",
     value: 0,
     paymentMethod: paymentMethods[0] || '',
     date: new Date(),
@@ -141,7 +141,7 @@ export default function SalesPage() {
   useEffect(() => {
     fetchSales();
 
-    const fetchCustomers = async () => {
+    const fetchCustomersData = async () => {
       setIsLoadingCustomers(true);
       try {
         const q = query(collection(db, "customers"), orderBy("name", "asc"));
@@ -159,12 +159,10 @@ export default function SalesPage() {
         setIsLoadingCustomers(false);
       }
     };
-    fetchCustomers();
+    fetchCustomersData();
   }, [toast]);
 
   useEffect(() => {
-    // This effect now only handles setting form data when editing an existing sale.
-    // For new sales, formData is set by handleInitiateQuickSale or handleInitiateRegisteredCustomerSale.
     if (isFormOpen && editingSale) {
       const customer = customers.find(c => c.id === editingSale.customerId);
       setFormData({
@@ -195,11 +193,11 @@ export default function SalesPage() {
   const handleInitiateQuickSale = () => {
     setEditingSale(null);
     setFormData({
-      ...initialFormData, // Start with defaults
+      ...initialFormData,
       customerId: null,
       customerName: "Consumidor Final",
-      date: new Date(), // Ensure current date for new sale
-      paymentDueDate: null, // Reset payment due date
+      date: new Date(), 
+      paymentDueDate: null,
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -208,11 +206,11 @@ export default function SalesPage() {
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
     setFormData({
-      ...initialFormData, // Start with defaults
-      customerId: null, // Allow selection
-      customerName: "Consumidor Final", // Default, can be changed by select
-      date: new Date(), // Ensure current date for new sale
-      paymentDueDate: null, // Reset payment due date
+      ...initialFormData, 
+      customerId: null, 
+      customerName: "Consumidor Final",
+      date: new Date(), 
+      paymentDueDate: null,
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -220,7 +218,6 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    // The useEffect for [isFormOpen, editingSale] will populate formData
     setIsFormOpen(true);
   };
 
@@ -315,7 +312,7 @@ export default function SalesPage() {
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
           relatedSaleId: saleIdForOperations,
-          createdAt: serverTimestamp() // Adding createdAt for stock movement
+          createdAt: serverTimestamp()
         };
         batch.set(stockMovementRef, stockMovementPayload);
       }
@@ -343,7 +340,6 @@ export default function SalesPage() {
         if (salePayloadForFirestore.status === 'Paid') {
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
-          // If sale is not pending anymore and a default entry exists, remove it.
           batch.delete(existingDefaultDoc.ref);
         }
       }
@@ -396,12 +392,12 @@ export default function SalesPage() {
               Escolha se a venda é para um cliente não cadastrado (rápida) ou para um cliente existente/novo.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4 space-y-3">
-            <Button onClick={handleInitiateQuickSale} className="w-full justify-start">
-              <Zap className="mr-2 h-4 w-4" /> Venda Rápida (Consumidor Final)
+          <div className="py-4 flex flex-col sm:flex-row gap-3">
+            <Button onClick={handleInitiateQuickSale} className="flex-1 py-6 text-base justify-center">
+              <Zap className="mr-2 h-5 w-5" /> Venda Rápida (Consumidor Final)
             </Button>
-            <Button onClick={handleInitiateRegisteredCustomerSale} className="w-full justify-start">
-              <UsersIcon className="mr-2 h-4 w-4" /> Venda para Cliente Cadastrado
+            <Button onClick={handleInitiateRegisteredCustomerSale} className="flex-1 py-6 text-base justify-center">
+              <UsersIcon className="mr-2 h-5 w-5" /> Venda para Cliente Cadastrado
             </Button>
           </div>
           <AlertDialogFooter>
@@ -488,7 +484,7 @@ export default function SalesPage() {
                         const selectedCust = customers.find(c => c.id === val);
                         setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
                     }}
-                    disabled={isSubmitting || isLoadingCustomers}
+                    disabled={isSubmitting || isLoadingCustomers || (editingSale === null && formData.customerName === "Consumidor Final" && formData.customerId === null)}
                   >
                     <SelectTrigger className="w-full bg-input text-foreground">
                       <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
