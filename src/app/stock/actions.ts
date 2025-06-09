@@ -2,40 +2,29 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { db } from '@/lib/firebase/config';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
 
+// Interface permanece para tipagem
 export interface StockMovementFormData {
   type: 'INPUT' | 'OUTPUT';
-  origin: string; // e.g., "Manual", "Sale", "Adjustment", "Loss"
+  origin: string; 
   quantity: number;
   notes?: string;
-  relatedSaleId?: string; // Optional, if movement is tied to a sale
+  relatedSaleId?: string; 
 }
 
 export interface StockMovementEntry extends StockMovementFormData {
   id: string;
-  createdAt: Timestamp;
+  createdAt: Timestamp; // Firestore Timestamp
 }
 
-export async function addStockMovement(formData: StockMovementFormData): Promise<{ success: boolean; error?: string; id?: string }> {
+export async function revalidateStockRelatedPages(): Promise<{ success: boolean }> {
   try {
-    const docRef = await addDoc(collection(db, 'stockMovements'), {
-      ...formData,
-      createdAt: Timestamp.now(),
-    });
     revalidatePath('/stock');
-    // Consider revalidating '/' if the dashboard stock count needs to be updated from this data.
-    revalidatePath('/'); 
-    return { success: true, id: docRef.id };
-  } catch (e: unknown) {
-    console.error('Error adding stock movement:', e);
-    let errorMessage = 'Falha ao registrar movimentação de estoque.';
-    if (e instanceof Error) {
-      errorMessage = e.message;
-    } else if (typeof e === 'string') {
-      errorMessage = e;
-    }
-    return { success: false, error: errorMessage };
+    revalidatePath('/'); // Dashboard might show stock info
+    return { success: true };
+  } catch (error) {
+    console.error('Error revalidating stock related pages:', error);
+    return { success: false };
   }
 }

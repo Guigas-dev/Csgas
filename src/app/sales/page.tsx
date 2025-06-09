@@ -40,10 +40,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  Timestamp,
+  serverTimestamp 
+} from "firebase/firestore";
 import type { Sale, SaleFormData } from "./actions";
-import { addSale, updateSale, deleteSale } from "./actions";
-import type { Customer } from "../customers/actions"; // Import Customer type
+import { revalidateSalesRelatedPages } from "./actions";
+import type { Customer } from "../customers/actions"; 
+import type { StockMovementFormData } from "../stock/actions"; // Import for stock movement
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
@@ -56,7 +68,7 @@ const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]); // State for Firestore customers
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -77,40 +89,42 @@ export default function SalesPage() {
   };
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
 
+  const fetchSales = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, "sales"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const salesData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
+          createdAt: data.createdAt, 
+        } as Sale;
+      });
+      setSales(salesData);
+    } catch (error) {
+      console.error("Error fetching sales: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar vendas",
+        description: "Não foi possível carregar o histórico de vendas.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchSales = async () => {
-      setIsLoading(true);
-      try {
-        const q = query(collection(db, "sales"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const salesData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-            createdAt: data.createdAt, 
-          } as Sale;
-        });
-        setSales(salesData);
-      } catch (error) {
-        console.error("Error fetching sales: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar vendas",
-          description: "Não foi possível carregar o histórico de vendas.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    fetchSales();
 
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
         const q = query(collection(db, "customers"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(q);
-        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        const customersData = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
         setCustomers(customersData);
       } catch (error) {
         console.error("Error fetching customers: ", error);
@@ -123,10 +137,8 @@ export default function SalesPage() {
         setIsLoadingCustomers(false);
       }
     };
-
-    fetchSales();
     fetchCustomers();
-  }, [toast]);
+  }, [toast]); // Removed fetchSales from dependencies
 
   useEffect(() => {
     if (isFormOpen) {
@@ -147,7 +159,7 @@ export default function SalesPage() {
         setFormData(initialFormData);
       }
     }
-  }, [isFormOpen, editingSale, customers]);
+  }, [isFormOpen, editingSale, customers, initialFormData]);
 
 
   const handleAddSale = () => {
@@ -164,12 +176,18 @@ export default function SalesPage() {
   const handleDeleteSale = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta venda?")) return;
     setIsSubmitting(true);
-    const result = await deleteSale(id);
-    if (result.success) {
+    try {
+      const saleRef = doc(db, 'sales', id);
+      await deleteDoc(saleRef);
       toast({ title: "Venda Removida!", description: "O registro da venda foi removido com sucesso." });
-      setSales(prev => prev.filter(s => s.id !== id)); 
-    } else {
-      toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
+      await revalidateSalesRelatedPages();
+      fetchSales(); 
+    } catch (e: unknown) {
+      console.error('Error deleting sale:', e);
+      let errorMessage = 'Falha ao excluir venda.';
+      if (e instanceof Error) errorMessage = e.message;
+      else if (typeof e === 'string') errorMessage = e;
+      toast({ variant: "destructive", title: "Erro ao excluir", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -179,32 +197,63 @@ export default function SalesPage() {
     setIsSubmitting(true);
     
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
-    const salePayload: SaleFormData = {
+    const salePayload: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> = {
       ...formData,
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : "Consumidor Final",
       value: parseFloat(String(formData.value)) || 0,
       gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
+      date: Timestamp.fromDate(formData.date), // Convert to Firestore Timestamp
     };
 
-    let result;
-    if (editingSale) {
-      result = await updateSale(editingSale.id, salePayload);
-      if (result.success) {
-        toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
-      }
-    } else {
-      result = await addSale(salePayload);
-      if (result.success && result.id) {
-         toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
-      }
-    }
+    try {
+      let saleIdForStockMovement: string | undefined;
 
-    if (result.success) {
+      if (editingSale) {
+        const saleRef = doc(db, 'sales', editingSale.id);
+        await updateDoc(saleRef, {
+          ...salePayload,
+          updatedAt: serverTimestamp(),
+        });
+        saleIdForStockMovement = editingSale.id;
+        toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
+      } else {
+        const docRef = await addDoc(collection(db, 'sales'), {
+          ...salePayload,
+          createdAt: serverTimestamp(),
+        });
+        saleIdForStockMovement = docRef.id;
+        toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
+      }
+
+      // Handle stock movement if subtractFromStock is true
+      // This part is only for NEW sales or if editing requires stock adjustment (complex case, not handled here for simplicity for edit)
+      if (formData.subtractFromStock && saleIdForStockMovement && !editingSale) { 
+        const stockMovementPayload: StockMovementFormData = {
+          type: 'OUTPUT',
+          origin: 'Venda',
+          quantity: salePayload.gasCanistersQuantity,
+          notes: `Saída automática por venda ID: ${saleIdForStockMovement}`,
+          relatedSaleId: saleIdForStockMovement,
+        };
+        await addDoc(collection(db, 'stockMovements'), {
+          ...stockMovementPayload,
+          createdAt: serverTimestamp(),
+        });
+        toast({ title: "Estoque Atualizado!", description: `${salePayload.gasCanistersQuantity} unidade(s) removida(s) do estoque.`});
+      }
+      // TODO: If editing a sale and quantity changes, or subtractFromStock changes, stock adjustment logic here would be more complex.
+      // For now, stock adjustment on edit is not implemented to keep it simple.
+
       setIsFormOpen(false);
-      // Data will be re-fetched by revalidatePath
-    } else {
-      toast({ variant: "destructive", title: "Erro ao salvar", description: result.error });
+      await revalidateSalesRelatedPages();
+      fetchSales();
+    } catch (e: unknown) {
+      console.error('Error saving sale:', e);
+      let errorMessage = 'Falha ao salvar venda.';
+      if (e instanceof Error) errorMessage = e.message;
+      else if (typeof e === 'string') errorMessage = e;
+      toast({ variant: "destructive", title: "Erro ao salvar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -258,7 +307,7 @@ export default function SalesPage() {
                     <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
                     <TableCell>{formatCurrency(sale.value)}</TableCell>
                     <TableCell>{sale.paymentMethod}</TableCell>
-                    <TableCell>{format(sale.date, "dd/MM/yyyy")}</TableCell>
+                    <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
                     <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
                     <TableCell>{sale.gasCanistersQuantity}</TableCell>
                     <TableCell className="max-w-[150px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>

@@ -34,16 +34,24 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc, 
+  Timestamp,
+  serverTimestamp 
+} from "firebase/firestore";
 import type { StockMovementEntry, StockMovementFormData } from "./actions";
-import { addStockMovement } from "./actions";
+import { revalidateStockRelatedPages } from "./actions";
 
-const movementOrigins = ["Manual", "Venda", "Ajuste", "Perda"]; // Adjusted "Sale" to "Venda" for consistency
+const movementOrigins = ["Manual", "Venda", "Ajuste", "Perda"];
 
 export default function StockPage() {
   const [stockMovements, setStockMovements] = useState<StockMovementEntry[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [currentMovementType, setCurrentMovementType] = useState<"INPUT" | "OUTPUT">("INPUT");
+  // currentMovementType is handled by formData.type
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -56,42 +64,42 @@ export default function StockPage() {
   };
   const [formData, setFormData] = useState<StockMovementFormData>(initialFormData);
 
+  const fetchStockMovements = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, "stockMovements"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const movementsData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: data.createdAt as Timestamp,
+        } as StockMovementEntry;
+      });
+      setStockMovements(movementsData);
+    } catch (error) {
+      console.error("Error fetching stock movements: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar movimentações",
+        description: "Não foi possível carregar o histórico de estoque.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    const fetchStockMovements = async () => {
-      setIsLoading(true);
-      try {
-        const q = query(collection(db, "stockMovements"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const movementsData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt, // Keep as Timestamp for internal use if needed, format on display
-          } as StockMovementEntry;
-        });
-        setStockMovements(movementsData);
-      } catch (error) {
-        console.error("Error fetching stock movements: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar movimentações",
-          description: "Não foi possível carregar o histórico de estoque.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchStockMovements();
-  }, [toast]);
+  }, [toast]); // Removed fetchStockMovements from dependencies
 
   const currentStockLevel = stockMovements.reduce((acc, mov) => {
     return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
   }, 0);
 
   const handleOpenForm = (type: "INPUT" | "OUTPUT") => {
-    setCurrentMovementType(type);
-    setFormData({ ...initialFormData, type, quantity: 0, notes: '' }); // Reset quantity and notes
+    setFormData({ ...initialFormData, type, quantity: 1, notes: '' }); 
     setIsFormOpen(true);
   };
 
@@ -99,20 +107,26 @@ export default function StockPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const payload: StockMovementFormData = {
+    const payload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
       ...formData,
       quantity: parseInt(String(formData.quantity)) || 0,
     };
 
-    const result = await addStockMovement(payload);
-
-    if (result.success && result.id) {
+    try {
+      await addDoc(collection(db, 'stockMovements'), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
       toast({ title: "Movimentação Registrada!", description: "A movimentação de estoque foi adicionada." });
-      // Optimistically add to local state or rely on re-fetch after revalidation
-      // For now, just close form. Data will re-fetch on next load or if useEffect dependency changes.
       setIsFormOpen(false);
-    } else {
-      toast({ variant: "destructive", title: "Erro ao Registrar", description: result.error });
+      await revalidateStockRelatedPages();
+      fetchStockMovements();
+    } catch (error: unknown) {
+      console.error('Error adding stock movement:', error);
+      let errorMessage = 'Falha ao registrar movimentação de estoque.';
+      if (error instanceof Error) errorMessage = error.message;
+      else if (typeof error === 'string') errorMessage = error;
+      toast({ variant: "destructive", title: "Erro ao Registrar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -181,7 +195,7 @@ export default function StockPage() {
                       </span>
                     </TableCell>
                     <TableCell>{mov.origin}</TableCell>
-                    <TableCell>{format((mov.createdAt as Timestamp).toDate(), "dd/MM/yyyy HH:mm")}</TableCell>
+                    <TableCell>{format(mov.createdAt.toDate(), "dd/MM/yyyy HH:mm")}</TableCell>
                     <TableCell>{mov.quantity}</TableCell>
                     <TableCell>{mov.relatedSaleId || "N/A"}</TableCell>
                     <TableCell className="max-w-[200px] truncate" title={mov.notes}>{mov.notes || "N/A"}</TableCell>
@@ -215,6 +229,7 @@ export default function StockPage() {
                   onChange={e => setFormData({...formData, quantity: parseInt(e.target.value) || 0})} 
                   className="bg-input text-foreground" 
                   required 
+                  min="1"
                   disabled={isSubmitting}
                 />
               </div>
@@ -225,7 +240,7 @@ export default function StockPage() {
                     <SelectValue placeholder="Origem da movimentação" />
                   </SelectTrigger>
                   <SelectContent>
-                    {movementOrigins.map(orig => <SelectItem key={orig} value={orig}>{orig}</SelectItem>)}
+                    {movementOrigins.filter(o => o !== "Venda").map(orig => <SelectItem key={orig} value={orig}>{orig}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -233,7 +248,7 @@ export default function StockPage() {
                 <Label htmlFor="notes" className="text-muted-foreground">Observações</Label>
                 <Input 
                   id="notes" 
-                  value={formData.notes} 
+                  value={formData.notes || ""} 
                   onChange={e => setFormData({...formData, notes: e.target.value})} 
                   className="bg-input text-foreground" 
                   disabled={isSubmitting}
