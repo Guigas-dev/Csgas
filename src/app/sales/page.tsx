@@ -55,7 +55,8 @@ import {
 import type { Sale, SaleFormData } from "./actions";
 import { revalidateSalesRelatedPages } from "./actions";
 import type { Customer } from "../customers/actions"; 
-import type { StockMovementFormData } from "../stock/actions"; // Import for stock movement
+import type { StockMovementEntry, StockMovementFormData } from "../stock/actions"; // Import StockMovementEntry
+import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
@@ -75,6 +76,7 @@ export default function SalesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { currentUser } = useAuth(); // Obter currentUser
   
   const initialFormData: SaleFormData = {
     customerId: null, 
@@ -138,7 +140,7 @@ export default function SalesPage() {
       }
     };
     fetchCustomers();
-  }, [toast]); // Removed fetchSales from dependencies
+  }, [toast]);
 
   useEffect(() => {
     if (isFormOpen) {
@@ -174,6 +176,10 @@ export default function SalesPage() {
   };
 
   const handleDeleteSale = async (id: string) => {
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para excluir." });
+      return;
+    }
     if (!confirm("Tem certeza que deseja excluir esta venda?")) return;
     setIsSubmitting(true);
     try {
@@ -194,66 +200,81 @@ export default function SalesPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentUser) {
+      toast({
+        variant: "destructive",
+        title: "Usuário não autenticado",
+        description: "Por favor, faça login para registrar uma venda.",
+      });
+      return;
+    }
     setIsSubmitting(true);
     
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
-    const salePayload: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> = {
-      ...formData,
+    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date'> & { date: Timestamp } = {
       customerId: formData.customerId || null,
-      customerName: selectedCustomer ? selectedCustomer.name : "Consumidor Final",
+      customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
       value: parseFloat(String(formData.value)) || 0,
+      paymentMethod: formData.paymentMethod,
+      date: Timestamp.fromDate(formData.date), 
+      status: formData.status,
       gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
-      date: Timestamp.fromDate(formData.date), // Convert to Firestore Timestamp
+      observations: formData.observations || '',
+      subtractFromStock: formData.subtractFromStock,
     };
 
     try {
       let saleIdForStockMovement: string | undefined;
+      let saleDocRef;
 
       if (editingSale) {
         const saleRef = doc(db, 'sales', editingSale.id);
         await updateDoc(saleRef, {
-          ...salePayload,
-          updatedAt: serverTimestamp(),
+          ...salePayloadForFirestore,
+          updatedAt: serverTimestamp(), 
         });
         saleIdForStockMovement = editingSale.id;
         toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
       } else {
-        const docRef = await addDoc(collection(db, 'sales'), {
-          ...salePayload,
-          createdAt: serverTimestamp(),
+        saleDocRef = await addDoc(collection(db, 'sales'), {
+          ...salePayloadForFirestore,
+          createdAt: serverTimestamp(), 
         });
-        saleIdForStockMovement = docRef.id;
+        saleIdForStockMovement = saleDocRef.id;
         toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
       }
 
-      // Handle stock movement if subtractFromStock is true
-      // This part is only for NEW sales or if editing requires stock adjustment (complex case, not handled here for simplicity for edit)
-      if (formData.subtractFromStock && saleIdForStockMovement && !editingSale) { 
-        const stockMovementPayload: StockMovementFormData = {
+      // TEMPORARIAMENTE COMENTADO PARA TESTAR SE A PERMISSÃO É NA COLEÇÃO 'sales' OU 'stockMovements'
+      /*
+      if (formData.subtractFromStock && saleIdForStockMovement) {
+        const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
           type: 'OUTPUT',
           origin: 'Venda',
-          quantity: salePayload.gasCanistersQuantity,
+          quantity: salePayloadForFirestore.gasCanistersQuantity, 
           notes: `Saída automática por venda ID: ${saleIdForStockMovement}`,
           relatedSaleId: saleIdForStockMovement,
         };
         await addDoc(collection(db, 'stockMovements'), {
           ...stockMovementPayload,
-          createdAt: serverTimestamp(),
+          createdAt: serverTimestamp(), 
         });
-        toast({ title: "Estoque Atualizado!", description: `${salePayload.gasCanistersQuantity} unidade(s) removida(s) do estoque.`});
+        toast({ title: "Estoque Atualizado!", description: `${salePayloadForFirestore.gasCanistersQuantity} unidade(s) removida(s) do estoque.`});
       }
-      // TODO: If editing a sale and quantity changes, or subtractFromStock changes, stock adjustment logic here would be more complex.
-      // For now, stock adjustment on edit is not implemented to keep it simple.
+      */
 
       setIsFormOpen(false);
-      await revalidateSalesRelatedPages();
-      fetchSales();
+      await revalidateSalesRelatedPages(); 
+      fetchSales(); 
     } catch (e: unknown) {
-      console.error('Error saving sale:', e);
+      console.error('Error saving sale:', e); // Alterado para refletir que pode ser apenas a venda
       let errorMessage = 'Falha ao salvar venda.';
-      if (e instanceof Error) errorMessage = e.message;
-      else if (typeof e === 'string') errorMessage = e;
-      toast({ variant: "destructive", title: "Erro ao salvar", description: errorMessage });
+       if (e instanceof Error) {
+        errorMessage = e.message; 
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      }
+      toast({ variant: "destructive", title: "Erro ao Salvar Venda", description: errorMessage }); // Alterado título do toast
     }
     setIsSubmitting(false);
   };
@@ -473,3 +494,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
