@@ -197,7 +197,7 @@ export default function SalesPage() {
       customerId: null,
       customerName: "Consumidor Final",
       date: new Date(), 
-      paymentDueDate: null, // Garante que está limpo para venda rápida
+      paymentDueDate: null, 
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -207,10 +207,10 @@ export default function SalesPage() {
     setEditingSale(null);
     setFormData({
       ...initialFormData, 
-      customerId: null, // Será selecionado ou cadastrado
-      customerName: "Consumidor Final", // Placeholder até selecionar
+      customerId: null, 
+      customerName: "Consumidor Final", 
       date: new Date(), 
-      paymentDueDate: null, // Limpo inicialmente
+      paymentDueDate: null, 
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -218,7 +218,6 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    // O useEffect [isFormOpen, editingSale, customers] já cuida de popular o formData
     setIsFormOpen(true);
   };
 
@@ -234,7 +233,6 @@ export default function SalesPage() {
       const saleRef = doc(db, 'sales', id);
       batch.delete(saleRef);
 
-      // Remove a pendência associada, se existir
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       if (!defaultsSnapshot.empty) {
@@ -272,7 +270,6 @@ export default function SalesPage() {
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     
-    // Payload para a coleção 'sales'
     const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> & { createdAt?: any, updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
@@ -307,12 +304,7 @@ export default function SalesPage() {
         saleIdForOperations = saleDocRef.id;
       }
 
-      // Lógica de movimentação de estoque
       if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
-        // TODO: Considerar o caso de edição de venda onde a quantidade de estoque mudou.
-        // Atualmente, sempre cria uma nova movimentação se subtractFromStock for true.
-        // Para edição, seria ideal ajustar a movimentação existente ou criar uma de ajuste.
-        // Por simplicidade, vamos manter a criação de uma nova movimentação de saída.
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
           type: 'OUTPUT',
@@ -320,12 +312,11 @@ export default function SalesPage() {
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
           relatedSaleId: saleIdForOperations,
-          createdAt: serverTimestamp() // Firestore server timestamp will be applied by batch.set
+          createdAt: serverTimestamp()
         };
         batch.set(stockMovementRef, stockMovementPayload);
       }
       
-      // Lógica de inadimplência
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
@@ -335,8 +326,8 @@ export default function SalesPage() {
             customerId: salePayloadForFirestore.customerId,
             customerName: salePayloadForFirestore.customerName,
             value: salePayloadForFirestore.value,
-            dueDate: salePayloadForFirestore.paymentDueDate, // Já é Timestamp
-            paymentStatus: 'Pending', // Status inicial da pendência
+            dueDate: salePayloadForFirestore.paymentDueDate, 
+            paymentStatus: 'Pending', 
             saleId: saleIdForOperations,
         };
         if (existingDefaultDoc) {
@@ -345,13 +336,10 @@ export default function SalesPage() {
             const newDefaultRef = doc(collection(db, 'defaults'));
             batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
         }
-      } else if (existingDefaultDoc) { // Se a venda não está pendente mas existia uma pendência
+      } else if (existingDefaultDoc) { 
         if (salePayloadForFirestore.status === 'Paid') {
-          // Se a venda foi paga, atualiza a pendência para "Paid"
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
-          // Se a venda mudou para um status que não é 'Pending' e não é 'Paid' (ex: Cancelled, Overdue - embora Overdue ainda seja pendente)
-          // ou se paymentDueDate foi removido, remove a pendência.
           batch.delete(existingDefaultDoc.ref);
         }
       }
@@ -406,6 +394,7 @@ export default function SalesPage() {
           </AlertDialogHeader>
           <div className="py-4 flex flex-col sm:flex-row justify-center items-center gap-4">
             <Button
+              variant="outline"
               onClick={handleInitiateQuickSale}
               className="w-40 h-40 p-4 text-sm flex flex-col items-center justify-center text-center gap-2 rounded-lg"
             >
@@ -413,6 +402,7 @@ export default function SalesPage() {
               <span>Venda Rápida (Consumidor Final)</span>
             </Button>
             <Button
+              variant="outline"
               onClick={handleInitiateRegisteredCustomerSale}
               className="w-40 h-40 p-4 text-sm flex flex-col items-center justify-center text-center gap-2 rounded-lg"
             >
