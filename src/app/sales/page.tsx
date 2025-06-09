@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2, Calendar as CalendarIcon, Zap, Users as UsersIcon } from "lucide-react";
@@ -92,6 +93,7 @@ export default function SalesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const router = useRouter(); // Initialize useRouter
 
   const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
 
@@ -181,6 +183,7 @@ export default function SalesPage() {
   }, [isFormOpen, editingSale, customers]);
 
   useEffect(() => {
+    // Clear paymentDueDate if status is not 'Pending'
     if (formData.status !== 'Pending') {
       setFormData(prev => ({ ...prev, paymentDueDate: null }));
     }
@@ -194,10 +197,10 @@ export default function SalesPage() {
     setEditingSale(null);
     setFormData({
       ...initialFormData,
-      customerId: null,
+      customerId: null, // Explicitly ensure it's for an unknown customer
       customerName: "Consumidor Final",
-      date: new Date(), 
-      paymentDueDate: null, 
+      date: new Date(), // Reset date for new sale
+      paymentDueDate: null, // Reset payment due date
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -205,16 +208,17 @@ export default function SalesPage() {
 
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
-    setFormData({
+    setFormData({ // Reset form, allow customer selection
       ...initialFormData, 
-      customerId: null, 
-      customerName: "Consumidor Final", 
-      date: new Date(), 
-      paymentDueDate: null, 
+      customerId: null, // Start with no customer selected
+      customerName: "Consumidor Final", // Default, user will change
+      date: new Date(), // Reset date for new sale
+      paymentDueDate: null, // Reset payment due date
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
   };
+
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
@@ -233,6 +237,7 @@ export default function SalesPage() {
       const saleRef = doc(db, 'sales', id);
       batch.delete(saleRef);
 
+      // Find and delete associated default entry
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       if (!defaultsSnapshot.empty) {
@@ -296,14 +301,16 @@ export default function SalesPage() {
         });
         saleIdForOperations = editingSale.id;
       } else {
+        // Gerar um novo ID para a venda
         saleDocRef = doc(collection(db, 'sales')); 
         batch.set(saleDocRef, {
           ...salePayloadForFirestore,
           createdAt: serverTimestamp(),
         });
-        saleIdForOperations = saleDocRef.id;
+        saleIdForOperations = saleDocRef.id; // Usar o ID gerado
       }
 
+      // Lógica para movimentação de estoque
       if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> & { createdAt: any } = {
@@ -311,35 +318,43 @@ export default function SalesPage() {
           origin: 'Venda',
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
-          relatedSaleId: saleIdForOperations,
+          relatedSaleId: saleIdForOperations, // Vincular ao ID da venda
           createdAt: serverTimestamp()
         };
         batch.set(stockMovementRef, stockMovementPayload);
       }
       
+      // Lógica para pendências (defaults)
+      // Verificar se já existe uma pendência para esta venda
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
 
       if (salePayloadForFirestore.status === 'Pending' && salePayloadForFirestore.paymentDueDate) {
+        // Se for pendente e tiver data de vencimento, criar/atualizar pendência
         const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any} = {
             customerId: salePayloadForFirestore.customerId,
             customerName: salePayloadForFirestore.customerName,
             value: salePayloadForFirestore.value,
-            dueDate: salePayloadForFirestore.paymentDueDate, 
-            paymentStatus: 'Pending', 
-            saleId: saleIdForOperations,
+            dueDate: salePayloadForFirestore.paymentDueDate, // Já é Timestamp
+            paymentStatus: 'Pending', // Se a venda é pendente, a pendência também é
+            saleId: saleIdForOperations, // Vincular à venda
         };
         if (existingDefaultDoc) {
+            // Atualiza a pendência existente
             batch.update(existingDefaultDoc.ref, {...defaultPayload, updatedAt: serverTimestamp()});
         } else {
+            // Cria uma nova pendência
             const newDefaultRef = doc(collection(db, 'defaults'));
             batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
         }
       } else if (existingDefaultDoc) { 
+        // Se a venda não é mais 'Pending' ou não tem data de vencimento, mas existia uma pendência
         if (salePayloadForFirestore.status === 'Paid') {
+          // Se a venda foi paga, marcar a pendência como paga
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
+          // Caso contrário (ex: venda cancelada, ou status mudou para algo que não requer pendência), remover a pendência
           batch.delete(existingDefaultDoc.ref);
         }
       }
@@ -504,7 +519,14 @@ export default function SalesPage() {
                       {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" className="flex-shrink-0" disabled={isSubmitting}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon" 
+                    className="flex-shrink-0" 
+                    disabled={isSubmitting}
+                    onClick={() => router.push('/customers')} // Redireciona para a página de clientes
+                  >
                     <UserPlus className="h-4 w-4" />
                   </Button>
                 </div>
