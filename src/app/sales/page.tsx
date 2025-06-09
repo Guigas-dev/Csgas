@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2 } from "lucide-react";
@@ -40,28 +40,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  orderBy, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   Timestamp,
-  serverTimestamp 
+  serverTimestamp,
+  writeBatch
 } from "firebase/firestore";
 import type { Sale, SaleFormData } from "./actions";
 import { revalidateSalesRelatedPages } from "./actions";
-import type { Customer } from "../customers/actions"; 
-import type { StockMovementEntry, StockMovementFormData } from "../stock/actions"; // Import StockMovementEntry
-import { useAuth } from "@/contexts/auth-context"; // Import useAuth
+import type { Customer } from "../customers/actions";
+import type { StockMovementEntry, StockMovementFormData } from "../stock/actions";
+import { useAuth } from "@/contexts/auth-context";
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
-    { value: "Paid", label: "Pago"}, 
-    { value: "Pending", label: "Pendente"}, 
+    { value: "Paid", label: "Pago"},
+    { value: "Pending", label: "Pendente"},
     { value: "Overdue", label: "Atrasado"}
 ];
 
@@ -76,19 +77,20 @@ export default function SalesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { currentUser } = useAuth(); // Obter currentUser
-  
-  const initialFormData: SaleFormData = {
-    customerId: null, 
+  const { currentUser } = useAuth();
+
+  const initialFormData = useMemo((): SaleFormData => ({
+    customerId: null,
     customerName: "Consumidor Final",
     value: 0,
     paymentMethod: paymentMethods[0] || '',
-    date: new Date(),
+    date: new Date(), // Will be overwritten for new sales when form opens
     status: 'Paid',
     gasCanistersQuantity: 1,
     observations: '',
     subtractFromStock: true,
-  };
+  }), []);
+
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
 
   const fetchSales = async () => {
@@ -102,7 +104,7 @@ export default function SalesPage() {
           id: docSnap.id,
           ...data,
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-          createdAt: data.createdAt, 
+          createdAt: data.createdAt,
         } as Sale;
       });
       setSales(salesData);
@@ -158,7 +160,11 @@ export default function SalesPage() {
           subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
         });
       } else {
-        setFormData(initialFormData);
+        // For new sales, set the current date when the form opens
+        setFormData(prev => ({
+          ...initialFormData, // Reset other fields to stable initial values
+          date: new Date()     // Set current date
+        }));
       }
     }
   }, [isFormOpen, editingSale, customers, initialFormData]);
@@ -166,13 +172,17 @@ export default function SalesPage() {
 
   const handleAddSale = () => {
     setEditingSale(null);
-    setFormData(initialFormData); 
+    // Set current date when opening form for a new sale
+    setFormData(prev => ({
+        ...initialFormData,
+        date: new Date()
+    }));
     setIsFormOpen(true);
   };
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    setIsFormOpen(true);
+    setIsFormOpen(true); // The useEffect above will populate formData
   };
 
   const handleDeleteSale = async (id: string) => {
@@ -187,7 +197,7 @@ export default function SalesPage() {
       await deleteDoc(saleRef);
       toast({ title: "Venda Removida!", description: "O registro da venda foi removido com sucesso." });
       await revalidateSalesRelatedPages();
-      fetchSales(); 
+      fetchSales();
     } catch (e: unknown) {
       console.error('Error deleting sale:', e);
       let errorMessage = 'Falha ao excluir venda.';
@@ -200,24 +210,25 @@ export default function SalesPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!currentUser) {
       toast({
         variant: "destructive",
         title: "Usuário não autenticado",
         description: "Por favor, faça login para registrar uma venda.",
       });
+      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
-    
+
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date'> & { date: Timestamp } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
       value: parseFloat(String(formData.value)) || 0,
       paymentMethod: formData.paymentMethod,
-      date: Timestamp.fromDate(formData.date), 
+      date: Timestamp.fromDate(formData.date),
       status: formData.status,
       gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
       observations: formData.observations || '',
@@ -225,60 +236,68 @@ export default function SalesPage() {
     };
 
     try {
-      let saleIdForStockMovement: string | undefined;
+      const batch = writeBatch(db);
+      let saleIdForStockMovement: string;
       let saleDocRef;
 
       if (editingSale) {
-        const saleRef = doc(db, 'sales', editingSale.id);
-        await updateDoc(saleRef, {
+        saleDocRef = doc(db, 'sales', editingSale.id);
+        batch.update(saleDocRef, {
           ...salePayloadForFirestore,
-          updatedAt: serverTimestamp(), 
+          updatedAt: serverTimestamp(),
         });
         saleIdForStockMovement = editingSale.id;
-        toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
       } else {
-        saleDocRef = await addDoc(collection(db, 'sales'), {
+        saleDocRef = doc(collection(db, 'sales')); // Create ref with auto-ID
+        batch.set(saleDocRef, {
           ...salePayloadForFirestore,
-          createdAt: serverTimestamp(), 
+          createdAt: serverTimestamp(),
         });
         saleIdForStockMovement = saleDocRef.id;
-        toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
       }
 
-      // TEMPORARIAMENTE COMENTADO PARA TESTAR SE A PERMISSÃO É NA COLEÇÃO 'sales' OU 'stockMovements'
-      /*
-      if (formData.subtractFromStock && saleIdForStockMovement) {
+      if (formData.subtractFromStock && saleIdForStockMovement && salePayloadForFirestore.gasCanistersQuantity > 0) {
+        const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
           type: 'OUTPUT',
           origin: 'Venda',
-          quantity: salePayloadForFirestore.gasCanistersQuantity, 
+          quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForStockMovement}`,
           relatedSaleId: saleIdForStockMovement,
         };
-        await addDoc(collection(db, 'stockMovements'), {
+        batch.set(stockMovementRef, {
           ...stockMovementPayload,
-          createdAt: serverTimestamp(), 
+          createdAt: serverTimestamp(),
         });
+      }
+
+      await batch.commit();
+
+      if (editingSale) {
+        toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
+      } else {
+        toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
+      }
+      if (formData.subtractFromStock && salePayloadForFirestore.gasCanistersQuantity > 0) {
         toast({ title: "Estoque Atualizado!", description: `${salePayloadForFirestore.gasCanistersQuantity} unidade(s) removida(s) do estoque.`});
       }
-      */
 
       setIsFormOpen(false);
-      await revalidateSalesRelatedPages(); 
-      fetchSales(); 
+      await revalidateSalesRelatedPages();
+      fetchSales();
     } catch (e: unknown) {
-      console.error('Error saving sale:', e); // Alterado para refletir que pode ser apenas a venda
-      let errorMessage = 'Falha ao salvar venda.';
+      console.error('Error saving sale and/or stock movement:', e);
+      let errorMessage = 'Falha ao salvar venda/movimentação de estoque.';
        if (e instanceof Error) {
-        errorMessage = e.message; 
+        errorMessage = e.message;
       } else if (typeof e === 'string') {
         errorMessage = e;
       }
-      toast({ variant: "destructive", title: "Erro ao Salvar Venda", description: errorMessage }); // Alterado título do toast
+      toast({ variant: "destructive", title: "Erro ao Salvar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
-  
+
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
@@ -362,8 +381,8 @@ export default function SalesPage() {
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <div className="flex items-center gap-2">
-                  <Select 
-                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE} 
+                  <Select
+                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
                     onValueChange={val => {
                         const selectedCust = customers.find(c => c.id === val);
                         setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
@@ -383,7 +402,7 @@ export default function SalesPage() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="space-y-1">
                 <Label htmlFor="date" className="text-muted-foreground">Data da Venda</Label>
                 <Popover>
@@ -459,10 +478,10 @@ export default function SalesPage() {
                   disabled={isSubmitting}
                 />
               </div>
-              
+
               <div className="items-top flex space-x-2 pt-2">
-                <Checkbox 
-                  id="subtractFromStock" 
+                <Checkbox
+                  id="subtractFromStock"
                   checked={formData.subtractFromStock}
                   onCheckedChange={(checked) => setFormData({...formData, subtractFromStock: !!checked})}
                   disabled={isSubmitting}
@@ -494,5 +513,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    

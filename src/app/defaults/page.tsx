@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Edit, PlusCircle, Filter, Loader2, Trash2 } from "lucide-react";
@@ -38,21 +38,23 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  orderBy, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   Timestamp,
-  serverTimestamp // Import serverTimestamp
+  serverTimestamp
 } from "firebase/firestore";
 import type { DefaultEntry, DefaultFormData } from "./actions";
-import { revalidateDefaultsRelatedPages } from "./actions"; // Importar a nova função de revalidação
+import { revalidateDefaultsRelatedPages } from "./actions";
 import type { Customer } from "../customers/actions";
+import { useAuth } from "@/contexts/auth-context";
+
 
 const paymentStatuses = ["Pending", "Paid"];
 const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
@@ -67,15 +69,17 @@ export default function DefaultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
-  const initialFormData: DefaultFormData = {
+  const { currentUser } = useAuth();
+
+  const initialFormData = useMemo((): DefaultFormData => ({
     customerId: null,
     customerName: 'Consumidor Final',
     value: 0,
-    dueDate: new Date(),
+    dueDate: new Date(), // Will be overwritten for new defaults when form opens
     paymentStatus: 'Pending',
     saleId: '',
-  };
+  }), []);
+
   const [formData, setFormData] = useState<DefaultFormData>(initialFormData);
 
   const fetchDefaults = async () => {
@@ -89,7 +93,7 @@ export default function DefaultsPage() {
           id: docSnap.id,
           ...data,
           dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
-          createdAt: data.createdAt, // Mantém como Timestamp se existir
+          createdAt: data.createdAt,
         } as DefaultEntry;
       });
       setDefaults(defaultsData);
@@ -142,23 +146,35 @@ export default function DefaultsPage() {
           saleId: editingDefault.saleId || '',
         });
       } else {
-        setFormData(initialFormData);
+        // For new defaults, set current date
+        setFormData(prev => ({
+          ...initialFormData,
+          dueDate: new Date()
+        }));
       }
     }
   }, [isFormOpen, editingDefault, customers, initialFormData]);
 
   const handleAddDefault = () => {
     setEditingDefault(null);
-    setFormData(initialFormData);
+    // Set current date for new default form
+    setFormData(prev => ({
+      ...initialFormData,
+      dueDate: new Date()
+    }));
     setIsFormOpen(true);
   };
 
   const handleEditDefault = (defaultItem: DefaultEntry) => {
     setEditingDefault(defaultItem);
-    setIsFormOpen(true);
+    setIsFormOpen(true); // The useEffect above will populate formData
   };
 
   const handleMarkAsPaid = async (id: string) => {
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
+      return;
+    }
     setIsSubmitting(true);
     try {
       const defaultRef = doc(db, 'defaults', id);
@@ -179,6 +195,10 @@ export default function DefaultsPage() {
   };
 
   const handleDeleteDefault = async (id: string) => {
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
+      return;
+    }
     if (!confirm("Tem certeza que deseja excluir esta pendência?")) return;
     setIsSubmitting(true);
     try {
@@ -198,31 +218,34 @@ export default function DefaultsPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
+      return;
+    }
     setIsSubmitting(true);
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
-    // Explicitly type payload before passing to Firestore functions
     const payload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === null ? "Consumidor Final" : "Cliente não encontrado"),
       value: parseFloat(String(formData.value)) || 0,
-      dueDate: Timestamp.fromDate(formData.dueDate), // Convert Date to Firestore Timestamp
+      dueDate: Timestamp.fromDate(formData.dueDate),
       paymentStatus: formData.paymentStatus,
       saleId: formData.saleId || '',
     };
-    
+
     try {
       if (editingDefault) {
         const defaultRef = doc(db, 'defaults', editingDefault.id);
         await updateDoc(defaultRef, {
-          ...payload, // Spread the base payload
-          updatedAt: serverTimestamp(), // Add/overwrite updatedAt
+          ...payload,
+          updatedAt: serverTimestamp(),
         });
         toast({ title: "Pendência Atualizada!", description: "Os dados da pendência foram atualizados."});
       } else {
         await addDoc(collection(db, 'defaults'), {
-          ...payload, // Spread the base payload
-          createdAt: serverTimestamp(), // Add createdAt
+          ...payload,
+          createdAt: serverTimestamp(),
         });
         toast({ title: "Pendência Adicionada!", description: "Nova pendência registrada com sucesso."});
       }
@@ -237,7 +260,7 @@ export default function DefaultsPage() {
     }
     setIsSubmitting(false);
   };
-  
+
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
@@ -323,8 +346,8 @@ export default function DefaultsPage() {
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
-                <Select 
-                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE} 
+                <Select
+                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
                     onValueChange={val => {
                         const selectedCust = customers.find(c => c.id === val);
                         setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
