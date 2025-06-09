@@ -14,13 +14,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -169,14 +171,13 @@ export default function SalesPage() {
       } else {
         setFormData(prev => ({
           ...initialFormData,
-          date: new Date(), // Ensure date is current for new sales
-          paymentDueDate: null, // Ensure paymentDueDate is null for new sales initially
+          date: new Date(), 
+          paymentDueDate: null,
         }));
       }
     }
   }, [isFormOpen, editingSale, customers, initialFormData]);
 
-  // Reset paymentDueDate if status is not 'Pending'
   useEffect(() => {
     if (formData.status !== 'Pending') {
       setFormData(prev => ({ ...prev, paymentDueDate: null }));
@@ -211,7 +212,6 @@ export default function SalesPage() {
       const saleRef = doc(db, 'sales', id);
       batch.delete(saleRef);
 
-      // Check for and delete associated default entry
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       if (!defaultsSnapshot.empty) {
@@ -249,7 +249,6 @@ export default function SalesPage() {
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     
-    // Prepare sale payload
     const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> & { createdAt?: any, updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
@@ -265,7 +264,7 @@ export default function SalesPage() {
 
     try {
       const batch = writeBatch(db);
-      let saleIdForStockMovement: string;
+      let saleIdForOperations: string;
       let saleDocRef;
 
       if (editingSale) {
@@ -274,46 +273,43 @@ export default function SalesPage() {
           ...salePayloadForFirestore,
           updatedAt: serverTimestamp(),
         });
-        saleIdForStockMovement = editingSale.id;
+        saleIdForOperations = editingSale.id;
       } else {
         saleDocRef = doc(collection(db, 'sales')); 
         batch.set(saleDocRef, {
           ...salePayloadForFirestore,
           createdAt: serverTimestamp(),
         });
-        saleIdForStockMovement = saleDocRef.id;
+        saleIdForOperations = saleDocRef.id;
       }
 
-      // Handle stock movement
-      if (formData.subtractFromStock && saleIdForStockMovement && salePayloadForFirestore.gasCanistersQuantity > 0) {
+      if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
           type: 'OUTPUT',
           origin: 'Venda',
           quantity: salePayloadForFirestore.gasCanistersQuantity,
-          notes: `Saída automática por venda ID: ${saleIdForStockMovement}`,
-          relatedSaleId: saleIdForStockMovement,
-          createdAt: Timestamp.now() // This will be overwritten by serverTimestamp in a real scenario but good for type
+          notes: `Saída automática por venda ID: ${saleIdForOperations}`,
+          relatedSaleId: saleIdForOperations,
         };
         batch.set(stockMovementRef, {
           ...stockMovementPayload,
-          createdAt: serverTimestamp(), // Use serverTimestamp for actual creation
+          createdAt: serverTimestamp(),
         });
       }
       
-      // Handle default entry creation/update/deletion
-      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForStockMovement), limit(1));
+      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
 
       if (salePayloadForFirestore.status === 'Pending' && salePayloadForFirestore.paymentDueDate) {
-        const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt'> & {createdAt?: any, updatedAt?: any} = {
+        const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any} = {
             customerId: salePayloadForFirestore.customerId,
             customerName: salePayloadForFirestore.customerName,
             value: salePayloadForFirestore.value,
-            dueDate: salePayloadForFirestore.paymentDueDate, // This is already a Timestamp
-            paymentStatus: 'Pending', // A sale with 'Pending' status means the default is also 'Pending'
-            saleId: saleIdForStockMovement,
+            dueDate: salePayloadForFirestore.paymentDueDate, 
+            paymentStatus: 'Pending', 
+            saleId: saleIdForOperations,
         };
         if (existingDefaultDoc) {
             batch.update(existingDefaultDoc.ref, {...defaultPayload, updatedAt: serverTimestamp()});
@@ -322,19 +318,12 @@ export default function SalesPage() {
             batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
         }
       } else if (existingDefaultDoc) { 
-        // If sale is no longer 'Pending' or has no due date, or if sale is 'Paid', remove/update the default
         if (salePayloadForFirestore.status === 'Paid') {
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
-          // If not 'Pending' and not 'Paid' (e.g., "Overdue" without a specific due date in sales form, or status changed)
-          // we might want to delete it if it's no longer relevant as a "pending payment" from the sale's perspective.
-          // Or, if the sale status is "Overdue", the default should remain "Pending" or become "Overdue".
-          // For now, if not 'Pending' and not 'Paid', and has an associated default, delete the default.
-          // This logic might need refinement based on exact business rules for "Overdue" status from sales.
           batch.delete(existingDefaultDoc.ref);
         }
       }
-
 
       await batch.commit();
 
@@ -348,13 +337,10 @@ export default function SalesPage() {
       await revalidateSalesRelatedPages();
       fetchSales();
     } catch (e: unknown) {
-      console.error('Error saving sale and/or stock movement/default:', e);
+      console.error('Error saving sale and/or related operations:', e);
       let errorMessage = 'Falha ao salvar venda/movimentação de estoque/pendência.';
-       if (e instanceof Error) {
-        errorMessage = e.message;
-      } else if (typeof e === 'string') {
-        errorMessage = e;
-      }
+       if (e instanceof Error) errorMessage = e.message;
+       else if (typeof e === 'string') errorMessage = e;
       toast({ variant: "destructive", title: "Erro ao Salvar", description: errorMessage });
     }
     setIsSubmitting(false);
@@ -436,16 +422,16 @@ export default function SalesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
-        <DialogContent className="sm:max-w-lg bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{editingSale ? "Editar Venda" : "Detalhes da Venda"}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">{editingSale ? "Editar Venda" : "Detalhes da Venda"}</SheetTitle>
+            <SheetDescription>
               {editingSale ? "Atualize os detalhes da transação." : "Preencha os detalhes da nova transação."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-grow">
+            <form onSubmit={handleFormSubmit} id="sale-form" className="py-4 pr-6 space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <div className="flex items-center gap-2">
@@ -598,16 +584,18 @@ export default function SalesPage() {
                 </div>
               </div>
 
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingSale ? "Salvar Alterações" : "Registrar Venda")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </form>
+          </ScrollArea>
+          <SheetFooter>
+            <SheetClose asChild>
+                <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
+            </SheetClose>
+            <Button type="submit" form="sale-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingSale ? "Salvar Alterações" : "Registrar Venda")}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

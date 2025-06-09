@@ -15,13 +15,15 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -75,7 +77,7 @@ export default function DefaultsPage() {
     customerId: null,
     customerName: 'Consumidor Final',
     value: 0,
-    dueDate: new Date(), // Will be overwritten for new defaults when form opens
+    dueDate: new Date(),
     paymentStatus: 'Pending',
     saleId: '',
   }), []);
@@ -146,7 +148,6 @@ export default function DefaultsPage() {
           saleId: editingDefault.saleId || '',
         });
       } else {
-        // For new defaults, set current date
         setFormData(prev => ({
           ...initialFormData,
           dueDate: new Date()
@@ -157,7 +158,6 @@ export default function DefaultsPage() {
 
   const handleAddDefault = () => {
     setEditingDefault(null);
-    // Set current date for new default form
     setFormData(prev => ({
       ...initialFormData,
       dueDate: new Date()
@@ -167,7 +167,7 @@ export default function DefaultsPage() {
 
   const handleEditDefault = (defaultItem: DefaultEntry) => {
     setEditingDefault(defaultItem);
-    setIsFormOpen(true); // The useEffect above will populate formData
+    setIsFormOpen(true); 
   };
 
   const handleMarkAsPaid = async (id: string) => {
@@ -220,6 +220,7 @@ export default function DefaultsPage() {
     e.preventDefault();
     if (!currentUser) {
       toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
+      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
@@ -334,16 +335,16 @@ export default function DefaultsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
-        <DialogContent className="sm:max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{editingDefault ? "Editar Pendência" : "Adicionar Nova Pendência"}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">{editingDefault ? "Editar Pendência" : "Adicionar Nova Pendência"}</SheetTitle>
+            <SheetDescription>
               Preencha os detalhes da pendência de pagamento.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-grow">
+            <form onSubmit={handleFormSubmit} id="default-form" className="py-4 pr-6 space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                 <Select
@@ -409,16 +410,18 @@ export default function DefaultsPage() {
                 <Label htmlFor="saleId" className="text-muted-foreground">ID Venda (Opc)</Label>
                 <Input id="saleId" value={formData.saleId} onChange={e => setFormData({...formData, saleId: e.target.value})} className="bg-input text-foreground" disabled={isSubmitting}/>
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingDefault ? "Salvar Alterações" : "Adicionar Pendência")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </form>
+          </ScrollArea>
+          <SheetFooter>
+            <SheetClose asChild>
+              <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
+            </SheetClose>
+            <Button type="submit" form="default-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingDefault ? "Salvar Alterações" : "Adicionar Pendência")}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

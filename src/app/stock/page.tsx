@@ -15,13 +15,15 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,21 +47,22 @@ import {
 } from "firebase/firestore";
 import type { StockMovementEntry, StockMovementFormData } from "./actions";
 import { revalidateStockRelatedPages } from "./actions";
+import { useAuth } from "@/contexts/auth-context";
 
 const movementOrigins = ["Manual", "Venda", "Ajuste", "Perda"];
 
 export default function StockPage() {
   const [stockMovements, setStockMovements] = useState<StockMovementEntry[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  // currentMovementType is handled by formData.type
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { currentUser } = useAuth();
 
   const initialFormData: StockMovementFormData = {
     type: 'INPUT',
     origin: 'Manual',
-    quantity: 0,
+    quantity: 1, // Default to 1
     notes: '',
   };
   const [formData, setFormData] = useState<StockMovementFormData>(initialFormData);
@@ -74,7 +77,7 @@ export default function StockPage() {
         return {
           id: docSnap.id,
           ...data,
-          createdAt: data.createdAt as Timestamp,
+          createdAt: data.createdAt as Timestamp, // Assuming createdAt is always a Timestamp
         } as StockMovementEntry;
       });
       setStockMovements(movementsData);
@@ -92,7 +95,7 @@ export default function StockPage() {
   
   useEffect(() => {
     fetchStockMovements();
-  }, [toast]); // Removed fetchStockMovements from dependencies
+  }, [toast]);
 
   const currentStockLevel = stockMovements.reduce((acc, mov) => {
     return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
@@ -105,6 +108,11 @@ export default function StockPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
+      setIsSubmitting(false);
+      return;
+    }
     setIsSubmitting(true);
 
     const payload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
@@ -198,7 +206,7 @@ export default function StockPage() {
                     <TableCell>{format(mov.createdAt.toDate(), "dd/MM/yyyy HH:mm")}</TableCell>
                     <TableCell>{mov.quantity}</TableCell>
                     <TableCell>{mov.relatedSaleId || "N/A"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={mov.notes}>{mov.notes || "N/A"}</TableCell>
+                    <TableCell className="max-w-[200px] truncate" title={mov.notes || undefined}>{mov.notes || "N/A"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -208,18 +216,18 @@ export default function StockPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
-        <DialogContent className="sm:max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">
               Registrar Movimentação Manual ({formData.type === "INPUT" ? "Entrada" : "Saída"})
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Preencha os detalhes da movimentação de estoque.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4">
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-grow">
+            <form onSubmit={handleFormSubmit} id="stock-form" className="py-4 pr-6 space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="quantity" className="text-muted-foreground">Quantidade</Label>
                 <Input 
@@ -254,16 +262,18 @@ export default function StockPage() {
                   disabled={isSubmitting}
                 />
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
+            </form>
+          </ScrollArea>
+          <SheetFooter>
+            <SheetClose asChild>
+                <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
+            </SheetClose>
+            <Button type="submit" form="stock-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

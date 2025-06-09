@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -14,13 +14,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +54,7 @@ export default function UsersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false); // Added for loading state
 
   const initialFormState = {
     name: "",
@@ -96,18 +99,26 @@ export default function UsersPage() {
       });
       return;
     }
-    setUsers(prev => prev.filter(u => u.id !== id));
-    toast({ title: "Usuário Removido!", description: "O registro do usuário foi removido." });
+    // Simulate API call for deletion
+    setIsSubmitting(true);
+    setTimeout(() => {
+        setUsers(prev => prev.filter(u => u.id !== id));
+        toast({ title: "Usuário Removido!", description: "O registro do usuário foi removido." });
+        setIsSubmitting(false);
+    }, 500);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     if (formData.password !== formData.confirmPassword && (!editingUser || formData.password)) {
       toast({
         variant: "destructive",
         title: "Erro de Validação",
         description: "As senhas não coincidem.",
       });
+      setIsSubmitting(false);
       return;
     }
     if (!editingUser && !formData.password) {
@@ -116,29 +127,34 @@ export default function UsersPage() {
         title: "Erro de Validação",
         description: "O campo senha é obrigatório para novos usuários.",
       });
+      setIsSubmitting(false);
       return;
     }
 
-    if (editingUser) {
-      const updatedUser = {
-         ...editingUser,
-        name: formData.name,
-        email: formData.email,
-        accessLevel: formData.accessLevel,
-      };
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? updatedUser : u));
-      toast({ title: "Usuário Atualizado!", description: "Os dados do usuário foram atualizados." });
-    } else {
-      const newUser: SystemUser = {
-        id: String(Date.now()),
-        name: formData.name,
-        email: formData.email,
-        accessLevel: formData.accessLevel,
-      };
-      setUsers(prev => [...prev, newUser]);
-      toast({ title: "Usuário Adicionado!", description: "Novo usuário cadastrado com sucesso." });
-    }
-    setIsFormOpen(false);
+    // Simulate API call for add/edit
+    setTimeout(() => {
+        if (editingUser) {
+          const updatedUser = {
+             ...editingUser,
+            name: formData.name,
+            email: formData.email,
+            accessLevel: formData.accessLevel,
+          };
+          setUsers(prev => prev.map(u => u.id === editingUser.id ? updatedUser : u));
+          toast({ title: "Usuário Atualizado!", description: "Os dados do usuário foram atualizados." });
+        } else {
+          const newUser: SystemUser = {
+            id: String(Date.now()),
+            name: formData.name,
+            email: formData.email,
+            accessLevel: formData.accessLevel,
+          };
+          setUsers(prev => [...prev, newUser]);
+          toast({ title: "Usuário Adicionado!", description: "Novo usuário cadastrado com sucesso." });
+        }
+        setIsFormOpen(false);
+        setIsSubmitting(false);
+    }, 1000);
   };
 
   return (
@@ -178,10 +194,10 @@ export default function UsersPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)} className="hover:text-accent">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)} className="hover:text-accent" disabled={isSubmitting}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.id)} className="hover:text-destructive" disabled={user.id === 'u1'}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.id)} className="hover:text-destructive" disabled={user.id === 'u1' || isSubmitting}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -193,23 +209,23 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-lg bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{editingUser ? 'Editar Usuário' : 'Adicionar Novo Usuário'}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">{editingUser ? 'Editar Usuário' : 'Adicionar Novo Usuário'}</SheetTitle>
+            <SheetDescription>
               {editingUser ? 'Atualize os dados do usuário.' : 'Preencha os dados do novo usuário.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-grow">
+            <form onSubmit={handleFormSubmit} id="user-form" className="py-4 pr-6 space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="userName" className="text-muted-foreground">Nome</Label>
-                <Input id="userName" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-input text-foreground" required />
+                <Input id="userName" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="userEmail" className="text-muted-foreground">Email</Label>
-                <Input id="userEmail" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-input text-foreground" required />
+                <Input id="userEmail" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
               </div>
               <div className="space-y-1 relative">
                 <Label htmlFor="userPassword" className="text-muted-foreground">Senha {editingUser ? "(Deixe em branco para não alterar)" : ""}</Label>
@@ -221,8 +237,9 @@ export default function UsersPage() {
                   className="bg-input text-foreground pr-10"
                   required={!editingUser}
                   placeholder={editingUser ? "Nova senha (opcional)" : "Senha obrigatória"}
+                  disabled={isSubmitting}
                 />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-6 h-7 w-7 text-muted-foreground" onClick={() => setShowPassword(!showPassword)}>
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-6 h-7 w-7 text-muted-foreground" onClick={() => setShowPassword(!showPassword)} disabled={isSubmitting}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
@@ -236,14 +253,15 @@ export default function UsersPage() {
                   className="bg-input text-foreground pr-10"
                   required={!editingUser || (!!formData.password)}
                   placeholder={editingUser && !formData.password ? "Confirme a nova senha (se alterada)" : "Confirme a senha"}
+                  disabled={isSubmitting}
                 />
-                 <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-6 h-7 w-7 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                 <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-6 h-7 w-7 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)} disabled={isSubmitting}>
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="accessLevel" className="text-muted-foreground">Nível de Acesso</Label>
-                <Select value={formData.accessLevel} onValueChange={(val: SystemUser["accessLevel"]) => setFormData({...formData, accessLevel: val})}>
+                <Select value={formData.accessLevel} onValueChange={(val: SystemUser["accessLevel"]) => setFormData({...formData, accessLevel: val})} disabled={isSubmitting}>
                   <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Selecione o nível" />
                   </SelectTrigger>
@@ -252,14 +270,18 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">{editingUser ? 'Salvar Alterações' : 'Adicionar Usuário'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </form>
+          </ScrollArea>
+          <SheetFooter>
+            <SheetClose asChild>
+              <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
+            </SheetClose>
+            <Button type="submit" form="user-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingUser ? 'Salvar Alterações' : 'Adicionar Usuário')}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
