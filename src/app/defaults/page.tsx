@@ -38,10 +38,21 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  Timestamp,
+  serverTimestamp // Import serverTimestamp
+} from "firebase/firestore";
 import type { DefaultEntry, DefaultFormData } from "./actions";
-import { addDefault, updateDefault, deleteDefault, markDefaultAsPaid } from "./actions";
-import type { Customer } from "../customers/actions"; // Import Customer type
+import { revalidateDefaultsRelatedPages } from "./actions"; // Importar a nova função de revalidação
+import type { Customer } from "../customers/actions";
 
 const paymentStatuses = ["Pending", "Paid"];
 const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
@@ -49,7 +60,7 @@ const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
 
 export default function DefaultsPage() {
   const [defaults, setDefaults] = useState<DefaultEntry[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]); // State for Firestore customers
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDefault, setEditingDefault] = useState<DefaultEntry | null>(null);
@@ -58,7 +69,7 @@ export default function DefaultsPage() {
   const { toast } = useToast();
   
   const initialFormData: DefaultFormData = {
-    customerId: null, // Null means "Consumidor Final"
+    customerId: null,
     customerName: 'Consumidor Final',
     value: 0,
     dueDate: new Date(),
@@ -67,40 +78,42 @@ export default function DefaultsPage() {
   };
   const [formData, setFormData] = useState<DefaultFormData>(initialFormData);
 
+  const fetchDefaults = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, "defaults"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const defaultsData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
+          createdAt: data.createdAt, // Mantém como Timestamp se existir
+        } as DefaultEntry;
+      });
+      setDefaults(defaultsData);
+    } catch (error) {
+      console.error("Error fetching defaults: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar pendências",
+        description: "Não foi possível carregar a lista de inadimplências.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDefaults = async () => {
-      setIsLoading(true);
-      try {
-        const q = query(collection(db, "defaults"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const defaultsData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
-            createdAt: data.createdAt,
-          } as DefaultEntry;
-        });
-        setDefaults(defaultsData);
-      } catch (error) {
-        console.error("Error fetching defaults: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar pendências",
-          description: "Não foi possível carregar a lista de inadimplências.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    fetchDefaults();
 
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
         const q = query(collection(db, "customers"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(q);
-        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        const customersData = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
         setCustomers(customersData);
       } catch (error) {
         console.error("Error fetching customers: ", error);
@@ -113,8 +126,6 @@ export default function DefaultsPage() {
         setIsLoadingCustomers(false);
       }
     };
-
-    fetchDefaults();
     fetchCustomers();
   }, [toast]);
 
@@ -134,7 +145,7 @@ export default function DefaultsPage() {
         setFormData(initialFormData);
       }
     }
-  }, [isFormOpen, editingDefault, customers]);
+  }, [isFormOpen, editingDefault, customers, initialFormData]);
 
   const handleAddDefault = () => {
     setEditingDefault(null);
@@ -149,12 +160,20 @@ export default function DefaultsPage() {
 
   const handleMarkAsPaid = async (id: string) => {
     setIsSubmitting(true);
-    const result = await markDefaultAsPaid(id);
-    if (result.success) {
-        toast({ title: "Pendência Paga!", description: "O status da pendência foi atualizado para pago."});
-        // Re-fetch or optimistic update needed
-    } else {
-        toast({ variant: "destructive", title: "Erro ao atualizar", description: result.error });
+    try {
+      const defaultRef = doc(db, 'defaults', id);
+      await updateDoc(defaultRef, {
+        paymentStatus: "Paid",
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "Pendência Paga!", description: "O status da pendência foi atualizado para pago."});
+      await revalidateDefaultsRelatedPages();
+      fetchDefaults();
+    } catch (e: unknown) {
+      console.error('Error marking default as paid:', e);
+      let errorMessage = 'Falha ao marcar como pago.';
+      if (e instanceof Error) errorMessage = e.message; else if (typeof e === 'string') errorMessage = e;
+      toast({ variant: "destructive", title: "Erro ao atualizar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -162,12 +181,17 @@ export default function DefaultsPage() {
   const handleDeleteDefault = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta pendência?")) return;
     setIsSubmitting(true);
-    const result = await deleteDefault(id);
-    if (result.success) {
+    try {
+      const defaultRef = doc(db, 'defaults', id);
+      await deleteDoc(defaultRef);
       toast({ title: "Pendência excluída!", description: "O registro foi removido com sucesso." });
-      // Re-fetch or optimistic update needed
-    } else {
-      toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
+      await revalidateDefaultsRelatedPages();
+      fetchDefaults();
+    } catch (e: unknown) {
+      console.error('Error deleting default:', e);
+      let errorMessage = 'Falha ao excluir pendência.';
+      if (e instanceof Error) errorMessage = e.message; else if (typeof e === 'string') errorMessage = e;
+      toast({ variant: "destructive", title: "Erro ao excluir", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -177,37 +201,44 @@ export default function DefaultsPage() {
     setIsSubmitting(true);
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
-    const defaultPayload: DefaultFormData = {
-      ...formData,
+    // Explicitly type payload before passing to Firestore functions
+    const payload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === null ? "Consumidor Final" : "Cliente não encontrado"),
       value: parseFloat(String(formData.value)) || 0,
+      dueDate: Timestamp.fromDate(formData.dueDate), // Convert Date to Firestore Timestamp
+      paymentStatus: formData.paymentStatus,
+      saleId: formData.saleId || '',
     };
     
-    let result;
-    if (editingDefault) {
-      result = await updateDefault(editingDefault.id, defaultPayload);
-      if (result.success) {
-         toast({ title: "Pendência Atualizada!", description: "Os dados da pendência foram atualizados."});
+    try {
+      if (editingDefault) {
+        const defaultRef = doc(db, 'defaults', editingDefault.id);
+        await updateDoc(defaultRef, {
+          ...payload, // Spread the base payload
+          updatedAt: serverTimestamp(), // Add/overwrite updatedAt
+        });
+        toast({ title: "Pendência Atualizada!", description: "Os dados da pendência foram atualizados."});
+      } else {
+        await addDoc(collection(db, 'defaults'), {
+          ...payload, // Spread the base payload
+          createdAt: serverTimestamp(), // Add createdAt
+        });
+        toast({ title: "Pendência Adicionada!", description: "Nova pendência registrada com sucesso."});
       }
-    } else {
-      result = await addDefault(defaultPayload);
-       if (result.success) {
-         toast({ title: "Pendência Adicionada!", description: "Nova pendência registrada com sucesso."});
-      }
-    }
-
-    if (result.success) {
       setIsFormOpen(false);
-      // Data will be re-fetched by revalidatePath
-    } else {
-      toast({ variant: "destructive", title: "Erro ao salvar", description: result.error });
+      await revalidateDefaultsRelatedPages();
+      fetchDefaults();
+    } catch (e: unknown) {
+      console.error('Error saving default:', e);
+      let errorMessage = 'Falha ao salvar pendência.';
+      if (e instanceof Error) errorMessage = e.message; else if (typeof e === 'string') errorMessage = e;
+      toast({ variant: "destructive", title: "Erro ao salvar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
   
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
 
   return (
     <div>
