@@ -51,13 +51,17 @@ import {
   doc,
   Timestamp,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  where,
+  limit
 } from "firebase/firestore";
 import type { Sale, SaleFormData } from "./actions";
 import { revalidateSalesRelatedPages } from "./actions";
 import type { Customer } from "../customers/actions";
-import type { StockMovementEntry, StockMovementFormData } from "../stock/actions";
+import type { StockMovementEntry } from "../stock/actions";
 import { useAuth } from "@/contexts/auth-context";
+import type { DefaultEntry } from "../defaults/actions";
+
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
@@ -84,8 +88,9 @@ export default function SalesPage() {
     customerName: "Consumidor Final",
     value: 0,
     paymentMethod: paymentMethods[0] || '',
-    date: new Date(), // Will be overwritten for new sales when form opens
+    date: new Date(),
     status: 'Paid',
+    paymentDueDate: null,
     gasCanistersQuantity: 1,
     observations: '',
     subtractFromStock: true,
@@ -104,6 +109,7 @@ export default function SalesPage() {
           id: docSnap.id,
           ...data,
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
+          paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
           createdAt: data.createdAt,
         } as Sale;
       });
@@ -153,36 +159,44 @@ export default function SalesPage() {
           customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
           value: editingSale.value,
           paymentMethod: editingSale.paymentMethod,
-          date: editingSale.date instanceof Date ? editingSale.date : new Date(editingSale.date),
+          date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
           status: editingSale.status,
+          paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
           gasCanistersQuantity: editingSale.gasCanistersQuantity,
           observations: editingSale.observations || '',
           subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
         });
       } else {
-        // For new sales, set the current date when the form opens
         setFormData(prev => ({
-          ...initialFormData, // Reset other fields to stable initial values
-          date: new Date()     // Set current date
+          ...initialFormData,
+          date: new Date(), // Ensure date is current for new sales
+          paymentDueDate: null, // Ensure paymentDueDate is null for new sales initially
         }));
       }
     }
   }, [isFormOpen, editingSale, customers, initialFormData]);
 
+  // Reset paymentDueDate if status is not 'Pending'
+  useEffect(() => {
+    if (formData.status !== 'Pending') {
+      setFormData(prev => ({ ...prev, paymentDueDate: null }));
+    }
+  }, [formData.status]);
+
 
   const handleAddSale = () => {
     setEditingSale(null);
-    // Set current date when opening form for a new sale
     setFormData(prev => ({
         ...initialFormData,
-        date: new Date()
+        date: new Date(),
+        paymentDueDate: null,
     }));
     setIsFormOpen(true);
   };
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    setIsFormOpen(true); // The useEffect above will populate formData
+    setIsFormOpen(true); 
   };
 
   const handleDeleteSale = async (id: string) => {
@@ -190,16 +204,27 @@ export default function SalesPage() {
       toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para excluir." });
       return;
     }
-    if (!confirm("Tem certeza que deseja excluir esta venda?")) return;
+    if (!confirm("Tem certeza que deseja excluir esta venda? Esta ação também removerá a pendência associada, se houver.")) return;
     setIsSubmitting(true);
     try {
+      const batch = writeBatch(db);
       const saleRef = doc(db, 'sales', id);
-      await deleteDoc(saleRef);
-      toast({ title: "Venda Removida!", description: "O registro da venda foi removido com sucesso." });
+      batch.delete(saleRef);
+
+      // Check for and delete associated default entry
+      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
+      const defaultsSnapshot = await getDocs(defaultsQuery);
+      if (!defaultsSnapshot.empty) {
+        const defaultDocRef = defaultsSnapshot.docs[0].ref;
+        batch.delete(defaultDocRef);
+      }
+      
+      await batch.commit();
+      toast({ title: "Venda Removida!", description: "O registro da venda e qualquer pendência associada foram removidos." });
       await revalidateSalesRelatedPages();
       fetchSales();
     } catch (e: unknown) {
-      console.error('Error deleting sale:', e);
+      console.error('Error deleting sale and associated default:', e);
       let errorMessage = 'Falha ao excluir venda.';
       if (e instanceof Error) errorMessage = e.message;
       else if (typeof e === 'string') errorMessage = e;
@@ -223,13 +248,16 @@ export default function SalesPage() {
     setIsSubmitting(true);
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
-    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date'> & { date: Timestamp } = {
+    
+    // Prepare sale payload
+    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> & { createdAt?: any, updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
       value: parseFloat(String(formData.value)) || 0,
       paymentMethod: formData.paymentMethod,
       date: Timestamp.fromDate(formData.date),
       status: formData.status,
+      paymentDueDate: formData.status === 'Pending' && formData.paymentDueDate ? Timestamp.fromDate(formData.paymentDueDate) : null,
       gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
       observations: formData.observations || '',
       subtractFromStock: formData.subtractFromStock,
@@ -248,7 +276,7 @@ export default function SalesPage() {
         });
         saleIdForStockMovement = editingSale.id;
       } else {
-        saleDocRef = doc(collection(db, 'sales')); // Create ref with auto-ID
+        saleDocRef = doc(collection(db, 'sales')); 
         batch.set(saleDocRef, {
           ...salePayloadForFirestore,
           createdAt: serverTimestamp(),
@@ -256,6 +284,7 @@ export default function SalesPage() {
         saleIdForStockMovement = saleDocRef.id;
       }
 
+      // Handle stock movement
       if (formData.subtractFromStock && saleIdForStockMovement && salePayloadForFirestore.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
@@ -264,30 +293,63 @@ export default function SalesPage() {
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForStockMovement}`,
           relatedSaleId: saleIdForStockMovement,
+          createdAt: Timestamp.now() // This will be overwritten by serverTimestamp in a real scenario but good for type
         };
         batch.set(stockMovementRef, {
           ...stockMovementPayload,
-          createdAt: serverTimestamp(),
+          createdAt: serverTimestamp(), // Use serverTimestamp for actual creation
         });
       }
+      
+      // Handle default entry creation/update/deletion
+      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForStockMovement), limit(1));
+      const defaultsSnapshot = await getDocs(defaultsQuery);
+      const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
+
+      if (salePayloadForFirestore.status === 'Pending' && salePayloadForFirestore.paymentDueDate) {
+        const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt'> & {createdAt?: any, updatedAt?: any} = {
+            customerId: salePayloadForFirestore.customerId,
+            customerName: salePayloadForFirestore.customerName,
+            value: salePayloadForFirestore.value,
+            dueDate: salePayloadForFirestore.paymentDueDate, // This is already a Timestamp
+            paymentStatus: 'Pending', // A sale with 'Pending' status means the default is also 'Pending'
+            saleId: saleIdForStockMovement,
+        };
+        if (existingDefaultDoc) {
+            batch.update(existingDefaultDoc.ref, {...defaultPayload, updatedAt: serverTimestamp()});
+        } else {
+            const newDefaultRef = doc(collection(db, 'defaults'));
+            batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
+        }
+      } else if (existingDefaultDoc) { 
+        // If sale is no longer 'Pending' or has no due date, or if sale is 'Paid', remove/update the default
+        if (salePayloadForFirestore.status === 'Paid') {
+          batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
+        } else {
+          // If not 'Pending' and not 'Paid' (e.g., "Overdue" without a specific due date in sales form, or status changed)
+          // we might want to delete it if it's no longer relevant as a "pending payment" from the sale's perspective.
+          // Or, if the sale status is "Overdue", the default should remain "Pending" or become "Overdue".
+          // For now, if not 'Pending' and not 'Paid', and has an associated default, delete the default.
+          // This logic might need refinement based on exact business rules for "Overdue" status from sales.
+          batch.delete(existingDefaultDoc.ref);
+        }
+      }
+
 
       await batch.commit();
 
-      if (editingSale) {
-        toast({ title: "Venda Atualizada!", description: "Os dados da venda foram atualizados." });
-      } else {
-        toast({ title: "Venda Registrada!", description: "A nova venda foi adicionada com sucesso." });
-      }
-      if (formData.subtractFromStock && salePayloadForFirestore.gasCanistersQuantity > 0) {
-        toast({ title: "Estoque Atualizado!", description: `${salePayloadForFirestore.gasCanistersQuantity} unidade(s) removida(s) do estoque.`});
-      }
-
+      toast({ 
+        title: editingSale ? "Venda Atualizada!" : "Venda Registrada!", 
+        description: (editingSale ? "Os dados da venda" : "A nova venda") + 
+                     " e quaisquer pendências/estoque associados foram atualizados." 
+      });
+      
       setIsFormOpen(false);
       await revalidateSalesRelatedPages();
       fetchSales();
     } catch (e: unknown) {
-      console.error('Error saving sale and/or stock movement:', e);
-      let errorMessage = 'Falha ao salvar venda/movimentação de estoque.';
+      console.error('Error saving sale and/or stock movement/default:', e);
+      let errorMessage = 'Falha ao salvar venda/movimentação de estoque/pendência.';
        if (e instanceof Error) {
         errorMessage = e.message;
       } else if (typeof e === 'string') {
@@ -334,8 +396,9 @@ export default function SalesPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Pagamento</TableHead>
-                  <TableHead>Data</TableHead>
+                  <TableHead>Data Venda</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Venc. Pag.</TableHead>
                   <TableHead>Botijões</TableHead>
                   <TableHead>Obs.</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -349,6 +412,11 @@ export default function SalesPage() {
                     <TableCell>{sale.paymentMethod}</TableCell>
                     <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
                     <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
+                    <TableCell>
+                      {sale.status === 'Pending' && sale.paymentDueDate 
+                        ? format(sale.paymentDueDate instanceof Timestamp ? sale.paymentDueDate.toDate() : sale.paymentDueDate, "dd/MM/yyyy") 
+                        : "-"}
+                    </TableCell>
                     <TableCell>{sale.gasCanistersQuantity}</TableCell>
                     <TableCell className="max-w-[150px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>
                     <TableCell className="text-right">
@@ -466,6 +534,36 @@ export default function SalesPage() {
                   </Select>
                 </div>
               </div>
+              
+              {formData.status === 'Pending' && (
+                <div className="space-y-1">
+                  <Label htmlFor="paymentDueDate" className="text-muted-foreground">Data Venc. Pagamento</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-input text-foreground hover:bg-accent-hover-bg hover:text-accent-foreground",
+                          !formData.paymentDueDate && "text-muted-foreground"
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.paymentDueDate ? format(formData.paymentDueDate, "dd/MM/yyyy") : <span>Escolha uma data</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-card">
+                      <Calendar
+                        mode="single"
+                        selected={formData.paymentDueDate}
+                        onSelect={(date) => setFormData({...formData, paymentDueDate: date || null})}
+                        initialFocus
+                        disabled={isSubmitting}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <Label htmlFor="observations" className="text-muted-foreground">Observações (Opcional)</Label>

@@ -11,14 +11,17 @@ export interface SaleFormData {
   value: number;
   paymentMethod: string;
   date: Date;
-  status: string;
+  status: string; // "Paid", "Pending", "Overdue"
+  paymentDueDate?: Date | null; // Data de vencimento para pagamentos pendentes
   gasCanistersQuantity: number;
   observations: string;
   subtractFromStock: boolean;
 }
 
-export interface Sale extends SaleFormData {
+export interface Sale extends Omit<SaleFormData, 'date' | 'paymentDueDate'> {
   id: string;
+  date: Timestamp; // Armazenado como Timestamp no Firestore
+  paymentDueDate?: Timestamp | null; // Armazenado como Timestamp no Firestore
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -28,6 +31,7 @@ export async function revalidateSalesRelatedPages(): Promise<{ success: boolean 
     revalidatePath('/sales');
     revalidatePath('/stock'); // Sales can affect stock
     revalidatePath('/'); // Dashboard might show sales or stock info
+    revalidatePath('/defaults'); // Sales pendentes podem afetar inadimplência
     return { success: true };
   } catch (error) {
     console.error('Error revalidating sales related pages:', error);
