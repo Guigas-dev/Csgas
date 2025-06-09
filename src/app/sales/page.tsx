@@ -270,7 +270,7 @@ export default function SalesPage() {
 
     const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
     
-    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'> & { createdAt?: any, updatedAt?: any } = {
+    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date' | 'paymentDueDate'> & { date: Timestamp, paymentDueDate: Timestamp | null, createdAt?: any, updatedAt?: any } = {
       customerId: formData.customerId || null,
       customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
       value: parseFloat(String(formData.value)) || 0,
@@ -306,7 +306,7 @@ export default function SalesPage() {
 
       if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
-        const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> = {
+        const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> & { createdAt: any } = {
           type: 'OUTPUT',
           origin: 'Venda',
           quantity: salePayloadForFirestore.gasCanistersQuantity,
@@ -399,7 +399,7 @@ export default function SalesPage() {
               className="w-40 h-40 p-4 text-sm flex flex-col items-center justify-center text-center gap-2 rounded-lg"
             >
               <Zap className="h-7 w-7 mb-1" />
-              <span>Venda Rápida (Consumidor Final)</span>
+              <span className="whitespace-normal">Venda Rápida (Consumidor Final)</span>
             </Button>
             <Button
               variant="outline"
@@ -407,7 +407,7 @@ export default function SalesPage() {
               className="w-40 h-40 p-4 text-sm flex flex-col items-center justify-center text-center gap-2 rounded-lg"
             >
               <UsersIcon className="h-7 w-7 mb-1" />
-              <span>Venda para Cliente Cadastrado</span>
+              <span className="whitespace-normal">Venda para Cliente Cadastrado</span>
             </Button>
           </div>
           <AlertDialogFooter>
