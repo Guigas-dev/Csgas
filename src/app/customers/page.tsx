@@ -25,10 +25,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase/config"; // Firestore instance
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  Timestamp,
+  serverTimestamp // Import serverTimestamp
+} from "firebase/firestore";
 import type { Customer, CustomerFormData } from "./actions";
-import { addCustomer, updateCustomer, deleteCustomer } from "./actions";
+import { revalidateCustomersPage } from "./actions";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -41,27 +52,37 @@ export default function CustomersPage() {
   const initialFormData: CustomerFormData = { name: '', cpf: '', address: '', phone: ''};
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
 
+  const fetchCustomers = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, "customers"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const customersData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          ...data,
+          // Convert Firestore Timestamps to JS Dates if they exist
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
+        } as Customer;
+      });
+      setCustomers(customersData);
+    } catch (error) {
+      console.error("Error fetching customers: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar clientes",
+        description: "Não foi possível carregar a lista de clientes.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCustomers = async () => {
-      setIsLoading(true);
-      try {
-        const q = query(collection(db, "customers"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        setCustomers(customersData);
-      } catch (error) {
-        console.error("Error fetching customers: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar clientes",
-          description: "Não foi possível carregar a lista de clientes.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchCustomers();
-  }, [toast]);
+  }, [toast]); // Removed fetchCustomers from dependency array to avoid re-fetch on its own change
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -76,17 +97,24 @@ export default function CustomersPage() {
   };
   
   const handleDeleteCustomer = async (id: string) => {
-    // Basic confirmation for now
     if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
 
     setIsSubmitting(true);
-    const result = await deleteCustomer(id);
-    if (result.success) {
+    try {
+      const customerRef = doc(db, 'customers', id);
+      await deleteDoc(customerRef);
       toast({ title: "Cliente excluído!", description: "O cliente foi removido com sucesso." });
-      // Optimistic update or re-fetch, revalidatePath handles this mostly
-      setCustomers(prev => prev.filter(c => c.id !== id));
-    } else {
-      toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
+      await revalidateCustomersPage(); // Revalidate after successful operation
+      fetchCustomers(); // Re-fetch to update UI
+    } catch (e: unknown) {
+      console.error('Error deleting customer:', e);
+      let errorMessage = 'Falha ao excluir cliente.';
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      }
+      toast({ variant: "destructive", title: "Erro ao excluir", description: errorMessage });
     }
     setIsSubmitting(false);
   };
@@ -94,25 +122,34 @@ export default function CustomersPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    let result;
-    if (editingCustomer) {
-      result = await updateCustomer(editingCustomer.id, formData);
-      if (result.success) {
+    
+    try {
+      if (editingCustomer) {
+        const customerRef = doc(db, 'customers', editingCustomer.id);
+        await updateDoc(customerRef, {
+          ...formData,
+          updatedAt: serverTimestamp(), // Use serverTimestamp for updates
+        });
         toast({ title: "Cliente atualizado!", description: "Os dados do cliente foram atualizados." });
-      }
-    } else {
-      result = await addCustomer(formData);
-      if (result.success) {
+      } else {
+        await addDoc(collection(db, 'customers'), {
+          ...formData,
+          createdAt: serverTimestamp(), // Use serverTimestamp for creation
+        });
         toast({ title: "Cliente adicionado!", description: "Novo cliente cadastrado com sucesso." });
       }
-    }
-
-    if (result.success) {
       setIsFormOpen(false);
-      // Data will be re-fetched by revalidatePath, but we can optimistically update for quicker UI response
-      // For simplicity, we rely on revalidatePath and useEffect re-fetch for now or manually trigger
-    } else {
-      toast({ variant: "destructive", title: "Erro ao salvar", description: result.error });
+      await revalidateCustomersPage(); // Revalidate after successful operation
+      fetchCustomers(); // Re-fetch to update UI
+    } catch (e: unknown) {
+      console.error('Error saving customer:', e);
+      let errorMessage = 'Falha ao salvar cliente.';
+       if (e instanceof Error) {
+        errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      }
+      toast({ variant: "destructive", title: "Erro ao salvar", description: errorMessage });
     }
     setIsSubmitting(false);
   };
