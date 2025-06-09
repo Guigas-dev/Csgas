@@ -93,7 +93,7 @@ export default function SalesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter(); 
 
   const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
 
@@ -197,10 +197,10 @@ export default function SalesPage() {
     setEditingSale(null);
     setFormData({
       ...initialFormData,
-      customerId: null, // Explicitly ensure it's for an unknown customer
+      customerId: null, 
       customerName: "Consumidor Final",
-      date: new Date(), // Reset date for new sale
-      paymentDueDate: null, // Reset payment due date
+      date: new Date(), 
+      paymentDueDate: null, 
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -208,12 +208,12 @@ export default function SalesPage() {
 
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
-    setFormData({ // Reset form, allow customer selection
+    setFormData({ 
       ...initialFormData, 
-      customerId: null, // Start with no customer selected
-      customerName: "Consumidor Final", // Default, user will change
-      date: new Date(), // Reset date for new sale
-      paymentDueDate: null, // Reset payment due date
+      customerId: null, 
+      customerName: "Consumidor Final", 
+      date: new Date(), 
+      paymentDueDate: null, 
     });
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
@@ -509,7 +509,7 @@ export default function SalesPage() {
                         const selectedCust = customers.find(c => c.id === val);
                         setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
                     }}
-                    disabled={isSubmitting || isLoadingCustomers || (editingSale === null && formData.customerName === "Consumidor Final" && formData.customerId === null)}
+                    disabled={isSubmitting || isLoadingCustomers}
                   >
                     <SelectTrigger className="w-full bg-input text-foreground">
                       <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
@@ -525,7 +525,7 @@ export default function SalesPage() {
                     size="icon" 
                     className="flex-shrink-0" 
                     disabled={isSubmitting}
-                    onClick={() => router.push('/customers')} // Redireciona para a página de clientes
+                    onClick={() => router.push('/customers')} 
                   >
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -675,3 +675,5 @@ export default function SalesPage() {
   );
 }
 
+
+    
