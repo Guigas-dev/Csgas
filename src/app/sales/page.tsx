@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2, Calendar as CalendarIcon, Zap, Users as UsersIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,6 +22,15 @@ import {
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +45,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -85,9 +93,11 @@ export default function SalesPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
+  const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
+
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
-    customerName: "Consumidor Final",
+    customerName: "Consumidor Final", // Default for quick sale, can be overridden
     value: 0,
     paymentMethod: paymentMethods[0] || '',
     date: new Date(),
@@ -153,30 +163,24 @@ export default function SalesPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (isFormOpen) {
-      if (editingSale) {
-        const customer = customers.find(c => c.id === editingSale.customerId);
-        setFormData({
-          customerId: editingSale.customerId || null,
-          customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
-          value: editingSale.value,
-          paymentMethod: editingSale.paymentMethod,
-          date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
-          status: editingSale.status,
-          paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
-          gasCanistersQuantity: editingSale.gasCanistersQuantity,
-          observations: editingSale.observations || '',
-          subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
-        });
-      } else {
-        setFormData(prev => ({
-          ...initialFormData,
-          date: new Date(), 
-          paymentDueDate: null,
-        }));
-      }
+    // This effect now only handles setting form data when editing an existing sale.
+    // For new sales, formData is set by handleInitiateQuickSale or handleInitiateRegisteredCustomerSale.
+    if (isFormOpen && editingSale) {
+      const customer = customers.find(c => c.id === editingSale.customerId);
+      setFormData({
+        customerId: editingSale.customerId || null,
+        customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
+        value: editingSale.value,
+        paymentMethod: editingSale.paymentMethod,
+        date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
+        status: editingSale.status,
+        paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
+        gasCanistersQuantity: editingSale.gasCanistersQuantity,
+        observations: editingSale.observations || '',
+        subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
+      });
     }
-  }, [isFormOpen, editingSale, customers, initialFormData]);
+  }, [isFormOpen, editingSale, customers]);
 
   useEffect(() => {
     if (formData.status !== 'Pending') {
@@ -184,20 +188,40 @@ export default function SalesPage() {
     }
   }, [formData.status]);
 
+  const openSaleTypeSelectionDialog = () => {
+    setIsSaleTypeDialogOpen(true);
+  };
 
-  const handleAddSale = () => {
+  const handleInitiateQuickSale = () => {
     setEditingSale(null);
-    setFormData(prev => ({
-        ...initialFormData,
-        date: new Date(),
-        paymentDueDate: null,
-    }));
+    setFormData({
+      ...initialFormData, // Start with defaults
+      customerId: null,
+      customerName: "Consumidor Final",
+      date: new Date(), // Ensure current date for new sale
+      paymentDueDate: null, // Reset payment due date
+    });
     setIsFormOpen(true);
+    setIsSaleTypeDialogOpen(false);
+  };
+
+  const handleInitiateRegisteredCustomerSale = () => {
+    setEditingSale(null);
+    setFormData({
+      ...initialFormData, // Start with defaults
+      customerId: null, // Allow selection
+      customerName: "Consumidor Final", // Default, can be changed by select
+      date: new Date(), // Ensure current date for new sale
+      paymentDueDate: null, // Reset payment due date
+    });
+    setIsFormOpen(true);
+    setIsSaleTypeDialogOpen(false);
   };
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    setIsFormOpen(true); 
+    // The useEffect for [isFormOpen, editingSale] will populate formData
+    setIsFormOpen(true);
   };
 
   const handleDeleteSale = async (id: string) => {
@@ -291,11 +315,9 @@ export default function SalesPage() {
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
           relatedSaleId: saleIdForOperations,
+          createdAt: serverTimestamp() // Adding createdAt for stock movement
         };
-        batch.set(stockMovementRef, {
-          ...stockMovementPayload,
-          createdAt: serverTimestamp(),
-        });
+        batch.set(stockMovementRef, stockMovementPayload);
       }
       
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
@@ -321,6 +343,7 @@ export default function SalesPage() {
         if (salePayloadForFirestore.status === 'Paid') {
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
+          // If sale is not pending anymore and a default entry exists, remove it.
           batch.delete(existingDefaultDoc.ref);
         }
       }
@@ -358,12 +381,36 @@ export default function SalesPage() {
             <Button variant="outline" className="text-foreground border-input hover:bg-accent-hover-bg hover:text-accent-foreground">
               <Filter className="mr-2 h-4 w-4" /> Filtros
             </Button>
-            <Button onClick={handleAddSale} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
+            <Button onClick={openSaleTypeSelectionDialog} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
               <PlusCircle className="mr-2 h-4 w-4" /> Registrar Venda
             </Button>
           </div>
         }
       />
+
+      <AlertDialog open={isSaleTypeDialogOpen} onOpenChange={setIsSaleTypeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecione o Tipo de Venda</AlertDialogTitle>
+            <AlertDialogDescription>
+              Escolha se a venda é para um cliente não cadastrado (rápida) ou para um cliente existente/novo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-3">
+            <Button onClick={handleInitiateQuickSale} className="w-full justify-start">
+              <Zap className="mr-2 h-4 w-4" /> Venda Rápida (Consumidor Final)
+            </Button>
+            <Button onClick={handleInitiateRegisteredCustomerSale} className="w-full justify-start">
+              <UsersIcon className="mr-2 h-4 w-4" /> Venda para Cliente Cadastrado
+            </Button>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline">Cancelar</Button>
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader>
@@ -400,7 +447,7 @@ export default function SalesPage() {
                     <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
                     <TableCell>
                       {sale.status === 'Pending' && sale.paymentDueDate 
-                        ? format(sale.paymentDueDate instanceof Timestamp ? sale.paymentDueDate.toDate() : sale.paymentDueDate, "dd/MM/yyyy") 
+                        ? format(sale.paymentDueDate instanceof Date ? sale.paymentDueDate : (sale.paymentDueDate as unknown as Timestamp).toDate(), "dd/MM/yyyy") 
                         : "-"}
                     </TableCell>
                     <TableCell>{sale.gasCanistersQuantity}</TableCell>
@@ -599,3 +646,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
