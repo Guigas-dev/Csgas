@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2, Calendar as CalendarIcon, Zap, Users as UsersIcon } from "lucide-react";
@@ -45,7 +45,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -83,8 +83,17 @@ const saleStatuses = [
 
 const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
 
+interface SalesFilterCriteria {
+  customerName: string;
+  status: string; // "All", "Paid", "Pending", "Overdue"
+  paymentMethod: string; // "All", "Pix", ...
+  startDate: Date | null;
+  endDate: Date | null;
+}
+
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [allSalesCache, setAllSalesCache] = useState<Sale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -96,6 +105,17 @@ export default function SalesPage() {
   const router = useRouter(); 
 
   const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const initialFilterCriteria: SalesFilterCriteria = useMemo(() => ({
+    customerName: '',
+    status: 'All',
+    paymentMethod: 'All',
+    startDate: null,
+    endDate: null,
+  }), []);
+  const [filterCriteria, setFilterCriteria] = useState<SalesFilterCriteria>(initialFilterCriteria);
+  
 
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
@@ -112,7 +132,38 @@ export default function SalesPage() {
 
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
 
-  const fetchSales = async () => {
+  const applyFilters = useCallback((dataToFilter: Sale[], criteria: SalesFilterCriteria) => {
+    let filteredSales = [...dataToFilter];
+
+    if (criteria.customerName) {
+      filteredSales = filteredSales.filter(sale =>
+        sale.customerName?.toLowerCase().includes(criteria.customerName.toLowerCase())
+      );
+    }
+    if (criteria.status && criteria.status !== "All") {
+      filteredSales = filteredSales.filter(sale => sale.status === criteria.status);
+    }
+    if (criteria.paymentMethod && criteria.paymentMethod !== "All") {
+      filteredSales = filteredSales.filter(sale => sale.paymentMethod === criteria.paymentMethod);
+    }
+    if (criteria.startDate) {
+      const startDateFilter = startOfDay(criteria.startDate);
+      filteredSales = filteredSales.filter(sale => {
+        const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
+        return saleDate >= startDateFilter;
+      });
+    }
+    if (criteria.endDate) {
+      const endDateFilter = endOfDay(criteria.endDate);
+      filteredSales = filteredSales.filter(sale => {
+        const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
+        return saleDate <= endDateFilter;
+      });
+    }
+    setSales(filteredSales);
+  }, []);
+
+  const fetchSales = useCallback(async () => {
     setIsLoading(true);
     try {
       const q = query(collection(db, "sales"), orderBy("createdAt", "desc"));
@@ -127,7 +178,8 @@ export default function SalesPage() {
           createdAt: data.createdAt,
         } as Sale;
       });
-      setSales(salesData);
+      setAllSalesCache(salesData);
+      applyFilters(salesData, filterCriteria);
     } catch (error) {
       console.error("Error fetching sales: ", error);
       toast({
@@ -138,7 +190,8 @@ export default function SalesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, filterCriteria, applyFilters]);
+
 
   useEffect(() => {
     fetchSales();
@@ -162,7 +215,7 @@ export default function SalesPage() {
       }
     };
     fetchCustomersData();
-  }, [toast]);
+  }, [fetchSales, toast]);
 
   useEffect(() => {
     if (isFormOpen && editingSale) {
@@ -183,7 +236,6 @@ export default function SalesPage() {
   }, [isFormOpen, editingSale, customers]);
 
   useEffect(() => {
-    // Clear paymentDueDate if status is not 'Pending'
     if (formData.status !== 'Pending') {
       setFormData(prev => ({ ...prev, paymentDueDate: null }));
     }
@@ -237,7 +289,6 @@ export default function SalesPage() {
       const saleRef = doc(db, 'sales', id);
       batch.delete(saleRef);
 
-      // Find and delete associated default entry
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       if (!defaultsSnapshot.empty) {
@@ -301,16 +352,14 @@ export default function SalesPage() {
         });
         saleIdForOperations = editingSale.id;
       } else {
-        // Gerar um novo ID para a venda
         saleDocRef = doc(collection(db, 'sales')); 
         batch.set(saleDocRef, {
           ...salePayloadForFirestore,
           createdAt: serverTimestamp(),
         });
-        saleIdForOperations = saleDocRef.id; // Usar o ID gerado
+        saleIdForOperations = saleDocRef.id;
       }
 
-      // Lógica para movimentação de estoque
       if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> & { createdAt: any } = {
@@ -318,43 +367,35 @@ export default function SalesPage() {
           origin: 'Venda',
           quantity: salePayloadForFirestore.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
-          relatedSaleId: saleIdForOperations, // Vincular ao ID da venda
+          relatedSaleId: saleIdForOperations,
           createdAt: serverTimestamp()
         };
         batch.set(stockMovementRef, stockMovementPayload);
       }
       
-      // Lógica para pendências (defaults)
-      // Verificar se já existe uma pendência para esta venda
       const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
       const defaultsSnapshot = await getDocs(defaultsQuery);
       const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
 
       if (salePayloadForFirestore.status === 'Pending' && salePayloadForFirestore.paymentDueDate) {
-        // Se for pendente e tiver data de vencimento, criar/atualizar pendência
         const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any} = {
             customerId: salePayloadForFirestore.customerId,
             customerName: salePayloadForFirestore.customerName,
             value: salePayloadForFirestore.value,
-            dueDate: salePayloadForFirestore.paymentDueDate, // Já é Timestamp
-            paymentStatus: 'Pending', // Se a venda é pendente, a pendência também é
-            saleId: saleIdForOperations, // Vincular à venda
+            dueDate: salePayloadForFirestore.paymentDueDate,
+            paymentStatus: 'Pending', 
+            saleId: saleIdForOperations,
         };
         if (existingDefaultDoc) {
-            // Atualiza a pendência existente
             batch.update(existingDefaultDoc.ref, {...defaultPayload, updatedAt: serverTimestamp()});
         } else {
-            // Cria uma nova pendência
             const newDefaultRef = doc(collection(db, 'defaults'));
             batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
         }
       } else if (existingDefaultDoc) { 
-        // Se a venda não é mais 'Pending' ou não tem data de vencimento, mas existia uma pendência
         if (salePayloadForFirestore.status === 'Paid') {
-          // Se a venda foi paga, marcar a pendência como paga
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
-          // Caso contrário (ex: venda cancelada, ou status mudou para algo que não requer pendência), remover a pendência
           batch.delete(existingDefaultDoc.ref);
         }
       }
@@ -382,6 +423,17 @@ export default function SalesPage() {
 
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  const handleApplyFilters = () => {
+    applyFilters(allSalesCache, filterCriteria);
+    setIsFilterSheetOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    setFilterCriteria(initialFilterCriteria);
+    applyFilters(allSalesCache, initialFilterCriteria);
+    setIsFilterSheetOpen(false);
+  };
+
   return (
     <div>
       <PageHeader
@@ -389,7 +441,11 @@ export default function SalesPage() {
         description="Gerencie o histórico de vendas e registre novas transações."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" className="text-foreground border-input hover:bg-accent-hover-bg hover:text-accent-foreground">
+            <Button 
+              variant="outline" 
+              className="text-foreground border-input hover:bg-accent-hover-bg hover:text-accent-foreground"
+              onClick={() => setIsFilterSheetOpen(true)}
+            >
               <Filter className="mr-2 h-4 w-4" /> Filtros
             </Button>
             <Button onClick={openSaleTypeSelectionDialog} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting}>
@@ -486,10 +542,11 @@ export default function SalesPage() {
               </TableBody>
             </Table>
           )}
-          {!isLoading && sales.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda registrada.</p>}
+          {!isLoading && sales.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda encontrada para os filtros atuais.</p>}
         </CardContent>
       </Card>
 
+      {/* Formulário de Venda (Sheet) */}
       <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
         <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
           <SheetHeader>
@@ -671,9 +728,122 @@ export default function SalesPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* Filtros Sheet */}
+      <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">Filtrar Vendas</SheetTitle>
+            <SheetDescription>
+              Aplique filtros para refinar a lista de vendas.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-grow p-1"> {/* Added p-1 for slight padding around form */}
+            <div className="py-4 pr-6 space-y-4"> {/* Removed form tag, will use buttons to trigger actions */}
+              <div className="space-y-1">
+                <Label htmlFor="filterCustomerName" className="text-muted-foreground">Nome do Cliente</Label>
+                <Input 
+                  id="filterCustomerName" 
+                  value={filterCriteria.customerName} 
+                  onChange={e => setFilterCriteria(prev => ({...prev, customerName: e.target.value}))}
+                  className="bg-input text-foreground"
+                  placeholder="Digite parte do nome"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="filterStatus" className="text-muted-foreground">Status da Venda</Label>
+                <Select 
+                  value={filterCriteria.status} 
+                  onValueChange={val => setFilterCriteria(prev => ({...prev, status: val}))}
+                >
+                  <SelectTrigger className="w-full bg-input text-foreground">
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">Todos os status</SelectItem>
+                    {saleStatuses.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="filterPaymentMethod" className="text-muted-foreground">Forma de Pagamento</Label>
+                <Select 
+                  value={filterCriteria.paymentMethod} 
+                  onValueChange={val => setFilterCriteria(prev => ({...prev, paymentMethod: val}))}
+                >
+                  <SelectTrigger className="w-full bg-input text-foreground">
+                    <SelectValue placeholder="Todas as formas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">Todas as formas</SelectItem>
+                    {paymentMethods.map(pm => <SelectItem key={pm} value={pm}>{pm}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="filterStartDate" className="text-muted-foreground">Data Inicial</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-input text-foreground hover:bg-accent-hover-bg hover:text-accent-foreground",
+                        !filterCriteria.startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterCriteria.startDate ? format(filterCriteria.startDate, "dd/MM/yyyy") : <span>Data inicial</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-card">
+                    <Calendar
+                      mode="single"
+                      selected={filterCriteria.startDate}
+                      onSelect={(date) => setFilterCriteria(prev => ({...prev, startDate: date || null}))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="filterEndDate" className="text-muted-foreground">Data Final</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-input text-foreground hover:bg-accent-hover-bg hover:text-accent-foreground",
+                        !filterCriteria.endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterCriteria.endDate ? format(filterCriteria.endDate, "dd/MM/yyyy") : <span>Data final</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-card">
+                    <Calendar
+                      mode="single"
+                      selected={filterCriteria.endDate}
+                      onSelect={(date) => setFilterCriteria(prev => ({...prev, endDate: date || null}))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </ScrollArea>
+          <SheetFooter>
+            <Button type="button" variant="outline" onClick={handleClearFilters}>Limpar Filtros</Button>
+            <Button type="button" onClick={handleApplyFilters} className="bg-primary hover:bg-primary-hover-bg text-primary-foreground">Aplicar Filtros</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
-
 
     
