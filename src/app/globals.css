@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    /* Inspired by the provided image - Dark Theme */
+    /* Inspired by the Firebase Console image - Dark Theme */
     --background: 220 10% 5%; /* Very dark gray: #0B0D0F */
     --foreground: 210 17% 95%; /* Light grey for text: #F0F2F5 */
 
@@ -15,12 +15,12 @@
     --popover: 220 10% 7%; /* Darker popover background: #101214 */
     --popover-foreground: 210 17% 95%;
 
-    /* Primary Colors - Vivid Blue */
+    /* Primary Colors - Vivid Blue (Firebase-like) */
     --primary: 210 100% 56%; /* Vivid Blue: #1880FF */
     --primary-hover-bg: 210 100% 50%; /* Darker Vivid Blue for hover: #006EF5 */
     --primary-foreground: 0 0% 100%; /* White text on primary blue */
 
-    /* Secondary Colors - For dark buttons with light text (like "+ Connect") */
+    /* Secondary Colors - For dark buttons with light text (like "+ Connect" in image) */
     --secondary: 220 10% 15%; /* Medium dark gray: #212529 */
     --secondary-foreground: 210 17% 90%; /* Light gray text on secondary: #E1E4E8 */
     
@@ -51,15 +51,15 @@
     --chart-2: 190 80% 50%; 
     --chart-3: 280 80% 60%; 
     --chart-4: 30 80% 60%;  
-    --chart-5: 145 63% 42%;
+    --chart-5: 145 63% 42%; /* Green for success-like charts */
 
-    --radius: 0.5rem; /* More rounded corners, like rounded-lg */
+    --radius: 0.5rem; /* More rounded corners, like rounded-lg from Tailwind */
 
-    /* Sidebar Specific Variables */
+    /* Sidebar Specific Variables (Firebase Console Style) */
     --sidebar-background: 220 10% 7%; /* Dark gray for sidebar: #101214 */
     --sidebar-foreground: 210 17% 80%; /* Medium-light grey for sidebar text: #C6CCD1 */
     
-    /* Active sidebar item: Lighter gray background, light text */
+    /* Active sidebar item: Lighter gray background, light text (NOT primary blue) */
     --sidebar-primary: 220 10% 15%; /* Lighter gray bg for active item: #212529 */
     --sidebar-primary-foreground: 210 17% 95%; /* Light text for active item: #F0F2F5 */
     --sidebar-primary-hover-bg: 220 10% 18%; /* Slightly darker for hover on active: #262C33 */
@@ -69,7 +69,7 @@
     --sidebar-accent-foreground: 210 17% 90%; /* Light grey for non-active hover text: #E1E4E8 */
     
     --sidebar-border: 220 10% 5%; /* Border for sidebar itself or separators: #0B0D0F */
-    --sidebar-ring: 210 100% 56%; 
+    --sidebar-ring: 210 100% 56%; /* Primary blue for focus rings, consistent with app */
   }
 
 }
