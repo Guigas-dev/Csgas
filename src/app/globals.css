@@ -4,56 +4,65 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%; /* Even Darker background like #121212 */
-    --foreground: 0 0% 87.8%; /* #E0E0E0 */
-    --card: 0 0% 10%; /* Darker card like #1A1A1A */
-    --card-foreground: 0 0% 87.8%;
-    --popover: 0 0% 8%; /* #141414 */
-    --popover-foreground: 0 0% 87.8%;
+    /* Base Palette - Firebase Console Inspired */
+    --background: 220 10% 6%; /* Very dark, slightly desaturated blue-grey: #0D0F12 */
+    --foreground: 210 17% 95%; /* Light grey for text: #F0F2F5 */
 
-    /* Updated Primary and Accent colors for better contrast */
-    --primary: 199 93% 64.1%; /* Light Blue #4FC3F7 */
-    --primary-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue #3BB1EE for hover */
-    --primary-foreground: 0 0% 10%; /* Dark color #1A1A1A (was accent-foreground) */
-    
-    --accent: 199 93% 64.1%; /* Light Blue #4FC3F7 (same as new primary) */
-    --accent-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue #3BB1EE for hover */
-    --accent-foreground: 0 0% 10%; /* Dark color #1A1A1A (same as new primary-foreground) */
+    --card: 220 10% 9%; /* Slightly lighter dark blue-grey for cards: #14171A */
+    --card-foreground: 210 17% 95%;
 
-    --secondary: 0 0% 22%; /* #383838 */
-    --secondary-foreground: 0 0% 90%;
-    
-    --muted: 0 0% 22%; /* #383838 */
-    --muted-foreground: 0 0% 75%; /* #BEBEBE - Lighter for better contrast */
-    
-    --destructive: 0 84.2% 60.2%; /* Brighter Red #FF5252 */
-    --destructive-foreground: 0 0% 10%; /* Dark text on destructive #1A1A1A */
-    
-    --success: 145 80% 40%; /* #27AE60 - Slightly desaturated green */
-    --success-foreground: 0 0% 10%; /* Dark text on success #1A1A1A */
-    
-    --border: 0 0% 16%; /* #292929 - Slightly lighter than card for subtle definition */
-    --subtle-border: 0 0% 87.8% / 0.08; /* For glassmorphism border - Foreground with low alpha */
-    --input: 0 0% 15%; /* #262626 */
-    --ring: 199 93% 64.1%; /* New primary color for rings (Light Blue) */
-    
-    --chart-1: 199 93% 64.1%; /* New Primary - Light Blue */
-    --chart-2: 231 53% 40.6%; /* Old Primary - Dark Blue (can be a secondary chart color) */
-    --chart-3: 145 75% 45%;   /* Success Green */
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --popover: 220 10% 7%; /* Darker popover background: #101214 */
+    --popover-foreground: 210 17% 95%;
 
-    /* Sidebar specific variables */
-    --sidebar-background: 0 0% 12%; /* #1F1F1F */
-    --sidebar-foreground: 0 0% 80%; /* #CCCCCC */
-    --sidebar-primary: 199 93% 64.1%; /* Light Blue */
-    --sidebar-primary-hover-bg: 199 93% 58%; /* Slightly Darker Light Blue for hover */
-    --sidebar-primary-foreground: 0 0% 10%; /* Dark text for light blue */
-    --sidebar-accent: 0 0% 18%; /* #2E2E2E - hover for sidebar items */
-    --sidebar-accent-foreground: 0 0% 90%; /* #E5E5E5 */
-    --sidebar-border: 0 0% 20%; /* #333333 */
-    --sidebar-ring: 199 93% 64.1%; /* Light Blue for rings */
+    /* Primary Colors - Google/Firebase Blue */
+    --primary: 210 100% 56%; /* Vivid Blue: #1880FF */
+    --primary-hover-bg: 210 100% 50%; /* Darker Vivid Blue for hover: #006EF5 */
+    --primary-foreground: 0 0% 100%; /* White text on primary blue */
+
+    /* Accent Colors - Follow Primary */
+    --accent: 210 100% 56%; /* Vivid Blue */
+    --accent-hover-bg: 210 100% 50%; /* Darker Vivid Blue for hover */
+    --accent-foreground: 0 0% 100%; /* White text on accent blue */
+
+    /* Secondary & Muted Colors */
+    --secondary: 215 15% 18%; /* Dark grey-blue: #262C33 */
+    --secondary-foreground: 210 17% 85%; /* Lighter grey for secondary text: #D0D4D9 */
+
+    --muted: 215 15% 18%; /* Same as secondary */
+    --muted-foreground: 210 17% 65%; /* Medium grey for muted text: #9BA1A8 */
+
+    /* Semantic Colors */
+    --destructive: 0 84% 60%; /* Bright Red: #FF5252 */
+    --destructive-foreground: 0 0% 100%; /* White text on destructive */
+
+    --success: 145 63% 42%; /* Green: #38A169 */
+    --success-foreground: 0 0% 100%; /* White text on success */
+
+    /* UI Elements */
+    --border: 215 15% 15%; /* Darker border: #20252B */
+    --subtle-border: 210 17% 95% / 0.08; /* Subtle border for glassmorphism if used */
+    --input: 215 15% 12%; /* Dark input background: #1A1E23 */
+    --ring: 210 100% 56%; /* Primary blue for rings */
+
+    /* Chart Colors */
+    --chart-1: 210 100% 56%; /* Primary Blue */
+    --chart-2: 190 80% 50%; /* A cyan-ish blue */
+    --chart-3: 280 80% 60%; /* A purple */
+    --chart-4: 30 80% 60%;  /* An orange */
+    --chart-5: 145 63% 42%; /* Success Green */
+
+    --radius: 0.5rem; /* Default radius */
+
+    /* Sidebar Specific Variables */
+    --sidebar-background: 220 10% 8%; /* Slightly different dark for sidebar: #121417 */
+    --sidebar-foreground: 210 17% 80%; /* Medium-light grey for sidebar text: #C6CCD1 */
+    --sidebar-primary: 210 100% 56%; /* Primary blue for active/hover items */
+    --sidebar-primary-hover-bg: 210 100% 50%; /* Darker primary blue for hover */
+    --sidebar-primary-foreground: 0 0% 100%; /* White text for active/hover items */
+    --sidebar-accent: 215 15% 15%; /* Darker grey for non-active hover: #20252B */
+    --sidebar-accent-foreground: 210 17% 90%; /* Light grey for non-active hover text: #E1E4E8 */
+    --sidebar-border: 220 10% 10%; /* Border for sidebar itself: #171A1D */
+    --sidebar-ring: 210 100% 56%; /* Primary blue for rings in sidebar context */
   }
 
 }
