@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2, Calendar as CalendarIcon, Zap, Users as UsersIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Filter, UserPlus, Package, Loader2, Calendar as CalendarIcon, Zap, Users as UsersIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -82,6 +82,7 @@ const saleStatuses = [
 ];
 
 const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
+const ITEMS_PER_PAGE = 10;
 
 interface SalesFilterCriteria {
   customerName: string;
@@ -92,8 +93,11 @@ interface SalesFilterCriteria {
 }
 
 export default function SalesPage() {
-  const [sales, setSales] = useState<Sale[]>([]);
   const [allSalesCache, setAllSalesCache] = useState<Sale[]>([]);
+  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
+  const [paginatedSales, setPaginatedSales] = useState<Sale[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -133,34 +137,35 @@ export default function SalesPage() {
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
 
   const applyFilters = useCallback((dataToFilter: Sale[], criteria: SalesFilterCriteria) => {
-    let filteredSales = [...dataToFilter];
+    let processedSales = [...dataToFilter];
 
     if (criteria.customerName) {
-      filteredSales = filteredSales.filter(sale =>
+      processedSales = processedSales.filter(sale =>
         sale.customerName?.toLowerCase().includes(criteria.customerName.toLowerCase())
       );
     }
     if (criteria.status && criteria.status !== "All") {
-      filteredSales = filteredSales.filter(sale => sale.status === criteria.status);
+      processedSales = processedSales.filter(sale => sale.status === criteria.status);
     }
     if (criteria.paymentMethod && criteria.paymentMethod !== "All") {
-      filteredSales = filteredSales.filter(sale => sale.paymentMethod === criteria.paymentMethod);
+      processedSales = processedSales.filter(sale => sale.paymentMethod === criteria.paymentMethod);
     }
     if (criteria.startDate) {
       const startDateFilter = startOfDay(criteria.startDate);
-      filteredSales = filteredSales.filter(sale => {
+      processedSales = processedSales.filter(sale => {
         const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
         return saleDate >= startDateFilter;
       });
     }
     if (criteria.endDate) {
       const endDateFilter = endOfDay(criteria.endDate);
-      filteredSales = filteredSales.filter(sale => {
+      processedSales = processedSales.filter(sale => {
         const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
         return saleDate <= endDateFilter;
       });
     }
-    setSales(filteredSales);
+    setFilteredSales(processedSales);
+    setCurrentPage(1); 
   }, []);
 
   const fetchSales = useCallback(async () => {
@@ -179,7 +184,7 @@ export default function SalesPage() {
         } as Sale;
       });
       setAllSalesCache(salesData);
-      applyFilters(salesData, filterCriteria);
+      applyFilters(salesData, filterCriteria); // Apply initial/current filters
     } catch (error) {
       console.error("Error fetching sales: ", error);
       toast({
@@ -216,6 +221,13 @@ export default function SalesPage() {
     };
     fetchCustomersData();
   }, [fetchSales, toast]);
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setPaginatedSales(filteredSales.slice(startIndex, endIndex));
+  }, [filteredSales, currentPage]);
+
 
   useEffect(() => {
     if (isFormOpen && editingSale) {
@@ -430,8 +442,18 @@ export default function SalesPage() {
 
   const handleClearFilters = () => {
     setFilterCriteria(initialFilterCriteria);
-    applyFilters(allSalesCache, initialFilterCriteria);
+    applyFilters(allSalesCache, initialFilterCriteria); // Apply to allSalesCache with initial (empty) criteria
     setIsFilterSheetOpen(false);
+  };
+
+  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   };
 
   return (
@@ -500,49 +522,76 @@ export default function SalesPage() {
               <p className="ml-2 text-muted-foreground">Carregando vendas...</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                  <TableHead>Data Venda</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Venc. Pag.</TableHead>
-                  <TableHead>Botijões</TableHead>
-                  <TableHead>Obs.</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
-                    <TableCell>{formatCurrency(sale.value)}</TableCell>
-                    <TableCell>{sale.paymentMethod}</TableCell>
-                    <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
-                    <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
-                    <TableCell>
-                      {sale.status === 'Pending' && sale.paymentDueDate 
-                        ? format(sale.paymentDueDate instanceof Date ? sale.paymentDueDate : (sale.paymentDueDate as unknown as Timestamp).toDate(), "dd/MM/yyyy") 
-                        : "-"}
-                    </TableCell>
-                    <TableCell>{sale.gasCanistersQuantity}</TableCell>
-                    <TableCell className="max-w-[150px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditSale(sale)} className="hover:text-accent" disabled={isSubmitting}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteSale(sale.id)} className="hover:text-destructive" disabled={isSubmitting}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Data Venda</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Venc. Pag.</TableHead>
+                    <TableHead>Botijões</TableHead>
+                    <TableHead>Obs.</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedSales.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
+                      <TableCell>{formatCurrency(sale.value)}</TableCell>
+                      <TableCell>{sale.paymentMethod}</TableCell>
+                      <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
+                      <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
+                      <TableCell>
+                        {sale.status === 'Pending' && sale.paymentDueDate 
+                          ? format(sale.paymentDueDate instanceof Date ? sale.paymentDueDate : (sale.paymentDueDate as unknown as Timestamp).toDate(), "dd/MM/yyyy") 
+                          : "-"}
+                      </TableCell>
+                      <TableCell>{sale.gasCanistersQuantity}</TableCell>
+                      <TableCell className="max-w-[150px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditSale(sale)} className="hover:text-accent" disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteSale(sale.id)} className="hover:text-destructive" disabled={isSubmitting}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {!isLoading && paginatedSales.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda encontrada para os filtros atuais.</p>}
+            </>
           )}
-          {!isLoading && sales.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma venda encontrada para os filtros atuais.</p>}
+          {!isLoading && totalPages > 0 && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -581,8 +630,8 @@ export default function SalesPage() {
                     variant="outline" 
                     size="icon" 
                     className="flex-shrink-0" 
-                    disabled={isSubmitting}
                     onClick={() => router.push('/customers')} 
+                    disabled={isSubmitting}
                   >
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -738,8 +787,8 @@ export default function SalesPage() {
               Aplique filtros para refinar a lista de vendas.
             </SheetDescription>
           </SheetHeader>
-          <ScrollArea className="flex-grow p-1"> {/* Added p-1 for slight padding around form */}
-            <div className="py-4 pr-6 space-y-4"> {/* Removed form tag, will use buttons to trigger actions */}
+          <ScrollArea className="flex-grow p-1"> 
+            <div className="py-4 pr-6 space-y-4"> 
               <div className="space-y-1">
                 <Label htmlFor="filterCustomerName" className="text-muted-foreground">Nome do Cliente</Label>
                 <Input 
@@ -845,5 +894,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
