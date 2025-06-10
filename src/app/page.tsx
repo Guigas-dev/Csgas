@@ -72,7 +72,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
      title.toLowerCase().includes("preço"));
 
   return (
-    <Card className="shadow-lg bg-card border-border/30">
+    <Card className="shadow-md bg-card">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         {icon}
@@ -333,7 +333,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <Card className="shadow-md bg-card border-border/30 mb-6">
+      <Card className="shadow-sm bg-card mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground flex items-center">
             <Flame className="mr-2 h-5 w-5 text-foreground" /> Preços do Gás
@@ -422,7 +422,7 @@ export default function DashboardPage() {
         {/* Coluna Esquerda */}
         <div className="lg:col-span-2 space-y-6">
           {/* Visão Geral de Vendas */}
-          <Card className="shadow-md bg-card border-border/30">
+          <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl text-foreground">Visão Geral de Vendas</CardTitle>
@@ -506,7 +506,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Nível de Estoque */}
-          <Card className="shadow-md bg-card border-border/30">
+          <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl flex items-center text-foreground">
@@ -576,7 +576,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Métricas Chave */}
-          <Card className="shadow-md bg-card border-border/30">
+          <Card className="shadow-sm bg-card">
             <CardHeader>
               <CardTitle className="text-xl flex items-center text-foreground">
                 <ListChecks className="mr-2 h-5 w-5 text-foreground" />
@@ -605,7 +605,7 @@ export default function DashboardPage() {
         {/* Coluna Direita */}
         <div className="lg:col-span-1 space-y-6">
           {/* Clientes Inadimplentes */}
-          <Card className="shadow-md bg-card border-border/30">
+          <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl flex items-center text-foreground">
@@ -654,7 +654,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Vendas Recentes */}
-          <Card className="shadow-md bg-card border-border/30">
+          <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl text-foreground">Vendas Recentes</CardTitle>

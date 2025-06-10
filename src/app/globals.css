@@ -1,68 +1,75 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Base Palette - Firebase Console Inspired */
-    --background: 220 10% 6%; /* Very dark, slightly desaturated blue-grey: #0D0F12 */
+    /* Inspired by the provided image - Dark Theme */
+    --background: 220 10% 5%; /* Very dark gray: #0B0D0F */
     --foreground: 210 17% 95%; /* Light grey for text: #F0F2F5 */
 
-    --card: 220 10% 9%; /* Slightly lighter dark blue-grey for cards: #14171A */
+    --card: 220 10% 9%; /* Dark gray for cards: #14171A */
     --card-foreground: 210 17% 95%;
 
     --popover: 220 10% 7%; /* Darker popover background: #101214 */
     --popover-foreground: 210 17% 95%;
 
-    /* Primary Colors - Google/Firebase Blue */
+    /* Primary Colors - Vivid Blue */
     --primary: 210 100% 56%; /* Vivid Blue: #1880FF */
     --primary-hover-bg: 210 100% 50%; /* Darker Vivid Blue for hover: #006EF5 */
     --primary-foreground: 0 0% 100%; /* White text on primary blue */
 
-    /* Accent Colors - Follow Primary */
-    --accent: 210 100% 56%; /* Vivid Blue */
-    --accent-hover-bg: 210 100% 50%; /* Darker Vivid Blue for hover */
-    --accent-foreground: 0 0% 100%; /* White text on accent blue */
-
-    /* Secondary & Muted Colors */
-    --secondary: 215 15% 18%; /* Dark grey-blue: #262C33 */
-    --secondary-foreground: 210 17% 85%; /* Lighter grey for secondary text: #D0D4D9 */
-
-    --muted: 215 15% 18%; /* Same as secondary */
+    /* Secondary Colors - For dark buttons with light text (like "+ Connect") */
+    --secondary: 220 10% 15%; /* Medium dark gray: #212529 */
+    --secondary-foreground: 210 17% 90%; /* Light gray text on secondary: #E1E4E8 */
+    
+    /* Muted Colors */
+    --muted: 220 10% 12%; /* Darker muted elements: #1A1E23 */
     --muted-foreground: 210 17% 65%; /* Medium grey for muted text: #9BA1A8 */
 
+    /* Accent Colors - General hover states for non-primary elements */
+    --accent: 220 10% 20%; /* Lighter gray for hover: #2B3036 */
+    --accent-hover-bg: 220 10% 25%; /* Slightly darker accent for deeper hover: #353B41 */
+    --accent-foreground: 210 17% 95%; /* Light text on accent */
+    
     /* Semantic Colors */
     --destructive: 0 84% 60%; /* Bright Red: #FF5252 */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
+    --destructive-foreground: 0 0% 100%;
 
     --success: 145 63% 42%; /* Green: #38A169 */
-    --success-foreground: 0 0% 100%; /* White text on success */
+    --success-foreground: 0 0% 100%;
 
     /* UI Elements */
-    --border: 215 15% 15%; /* Darker border: #20252B */
-    --subtle-border: 210 17% 95% / 0.08; /* Subtle border for glassmorphism if used */
-    --input: 215 15% 12%; /* Dark input background: #1A1E23 */
+    --border: 220 10% 12%; /* Subtle border, close to card color for minimal lines: #1A1E23 */
+    --subtle-border: 210 17% 95% / 0.08; 
+    --input: 220 10% 12%; /* Dark input background: #1A1E23 */
     --ring: 210 100% 56%; /* Primary blue for rings */
 
     /* Chart Colors */
     --chart-1: 210 100% 56%; /* Primary Blue */
-    --chart-2: 190 80% 50%; /* A cyan-ish blue */
-    --chart-3: 280 80% 60%; /* A purple */
-    --chart-4: 30 80% 60%;  /* An orange */
-    --chart-5: 145 63% 42%; /* Success Green */
+    --chart-2: 190 80% 50%; 
+    --chart-3: 280 80% 60%; 
+    --chart-4: 30 80% 60%;  
+    --chart-5: 145 63% 42%;
 
-    --radius: 0.375rem; /* Default radius (md) */
+    --radius: 0.5rem; /* More rounded corners, like rounded-lg */
 
     /* Sidebar Specific Variables */
-    --sidebar-background: 220 10% 8%; /* Slightly different dark for sidebar: #121417 */
+    --sidebar-background: 220 10% 7%; /* Dark gray for sidebar: #101214 */
     --sidebar-foreground: 210 17% 80%; /* Medium-light grey for sidebar text: #C6CCD1 */
-    --sidebar-primary: 210 100% 56%; /* Primary blue for active/hover items */
-    --sidebar-primary-hover-bg: 210 100% 50%; /* Darker primary blue for hover */
-    --sidebar-primary-foreground: 0 0% 100%; /* White text for active/hover items */
-    --sidebar-accent: 215 15% 15%; /* Darker grey for non-active hover: #20252B */
+    
+    /* Active sidebar item: Lighter gray background, light text */
+    --sidebar-primary: 220 10% 15%; /* Lighter gray bg for active item: #212529 */
+    --sidebar-primary-foreground: 210 17% 95%; /* Light text for active item: #F0F2F5 */
+    --sidebar-primary-hover-bg: 220 10% 18%; /* Slightly darker for hover on active: #262C33 */
+    
+    /* Hover for non-active sidebar items */
+    --sidebar-accent: 220 10% 10%; /* Darker gray for non-active hover bg: #171A1D */
     --sidebar-accent-foreground: 210 17% 90%; /* Light grey for non-active hover text: #E1E4E8 */
-    --sidebar-border: 220 10% 10%; /* Border for sidebar itself: #171A1D */
-    --sidebar-ring: 210 100% 56%; /* Primary blue for rings in sidebar context */
+    
+    --sidebar-border: 220 10% 5%; /* Border for sidebar itself or separators: #0B0D0F */
+    --sidebar-ring: 210 100% 56%; 
   }
 
 }
