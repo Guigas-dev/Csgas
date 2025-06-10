@@ -37,7 +37,8 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  serverTimestamp 
+  serverTimestamp,
+  where 
 } from "firebase/firestore";
 import type { Customer, CustomerFormData } from "./actions";
 import { revalidateCustomersPage } from "./actions";
@@ -133,6 +134,24 @@ export default function CustomersPage() {
     
     try {
       if (editingCustomer) {
+        // Se estiver editando, e o CPF foi alterado, verificar se o NOVO CPF já existe em OUTRO cliente.
+        if (formData.cpf !== editingCustomer.cpf) {
+          const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            // Verifica se o CPF encontrado pertence a um cliente diferente do que está sendo editado
+            const existingCustomer = querySnapshot.docs.find(d => d.id !== editingCustomer.id);
+            if (existingCustomer) {
+              toast({
+                variant: "destructive",
+                title: "Erro ao Atualizar Cliente",
+                description: "Já existe outro cliente cadastrado com este CPF.",
+              });
+              setIsSubmitting(false);
+              return;
+            }
+          }
+        }
         const customerRef = doc(db, 'customers', editingCustomer.id);
         await updateDoc(customerRef, {
           ...formData,
@@ -140,6 +159,18 @@ export default function CustomersPage() {
         });
         toast({ title: "Cliente atualizado!", description: "Os dados do cliente foram atualizados." });
       } else {
+        // Se estiver adicionando um novo cliente, verificar se o CPF já existe.
+        const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao Adicionar Cliente",
+            description: "Já existe um cliente cadastrado com este CPF.",
+          });
+          setIsSubmitting(false);
+          return;
+        }
         await addDoc(collection(db, 'customers'), {
           ...formData,
           createdAt: serverTimestamp(), 

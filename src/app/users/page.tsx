@@ -54,7 +54,7 @@ export default function UsersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false); // Added for loading state
+  const [isSubmitting, setIsSubmitting] = useState(false); 
 
   const initialFormState = {
     name: "",
@@ -99,7 +99,6 @@ export default function UsersPage() {
       });
       return;
     }
-    // Simulate API call for deletion
     setIsSubmitting(true);
     setTimeout(() => {
         setUsers(prev => prev.filter(u => u.id !== id));
@@ -131,9 +130,21 @@ export default function UsersPage() {
       return;
     }
 
-    // Simulate API call for add/edit
     setTimeout(() => {
         if (editingUser) {
+          // Verifica se o email está sendo alterado e se o novo email já existe (excluindo o usuário atual)
+          if (formData.email.toLowerCase() !== editingUser.email.toLowerCase()) {
+            const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser.id);
+            if (emailExists) {
+              toast({
+                variant: "destructive",
+                title: "Erro ao Atualizar",
+                description: "Este email já está em uso por outro usuário.",
+              });
+              setIsSubmitting(false);
+              return;
+            }
+          }
           const updatedUser = {
              ...editingUser,
             name: formData.name,
@@ -143,6 +154,17 @@ export default function UsersPage() {
           setUsers(prev => prev.map(u => u.id === editingUser.id ? updatedUser : u));
           toast({ title: "Usuário Atualizado!", description: "Os dados do usuário foram atualizados." });
         } else {
+          // Verifica se o email já existe para novo usuário
+          const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase());
+          if (emailExists) {
+            toast({
+              variant: "destructive",
+              title: "Erro ao Adicionar",
+              description: "Este email já está cadastrado.",
+            });
+            setIsSubmitting(false);
+            return;
+          }
           const newUser: SystemUser = {
             id: String(Date.now()),
             name: formData.name,
