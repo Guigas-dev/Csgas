@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -45,12 +45,26 @@ interface SystemUser {
 const initialUsersData: SystemUser[] = [
   { id: "u1", name: "Administrador Master", email: "admin@vendafacil.com", accessLevel: "Admin" },
   { id: "u2", name: "Usuário Padrão", email: "user@vendafacil.com", accessLevel: "Usuário" },
+  { id: "u3", name: "Ana Silva", email: "ana.silva@example.com", accessLevel: "Usuário" },
+  { id: "u4", name: "Bruno Costa", email: "bruno.costa@example.com", accessLevel: "Admin" },
+  { id: "u5", name: "Carla Dias", email: "carla.dias@example.com", accessLevel: "Usuário" },
+  { id: "u6", name: "Daniel Faria", email: "daniel.faria@example.com", accessLevel: "Usuário" },
+  { id: "u7", name: "Eduarda Lima", email: "eduarda.lima@example.com", accessLevel: "Admin" },
+  { id: "u8", name: "Fábio Melo", email: "fabio.melo@example.com", accessLevel: "Usuário" },
+  { id: "u9", name: "Gabriela Nogueira", email: "gabriela.nogueira@example.com", accessLevel: "Usuário" },
+  { id: "u10", name: "Hugo Santos", email: "hugo.santos@example.com", accessLevel: "Admin" },
+  { id: "u11", name: "Isabela Ribeiro", email: "isabela.ribeiro@example.com", accessLevel: "Usuário" },
+  { id: "u12", name: "João Pedro Alves", email: "joao.alves@example.com", accessLevel: "Usuário" },
 ];
 
 const accessLevelsOptions: SystemUser["accessLevel"][] = ["Admin", "Usuário"];
+const ITEMS_PER_PAGE = 10;
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<SystemUser[]>(initialUsersData);
+  const [allUsers, setAllUsers] = useState<SystemUser[]>(initialUsersData); // Stores all users (mocked)
+  const [paginatedUsers, setPaginatedUsers] = useState<SystemUser[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const { toast } = useToast();
@@ -67,6 +81,21 @@ export default function UsersPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setPaginatedUsers(allUsers.slice(startIndex, endIndex));
+  }, [allUsers, currentPage]);
+
+  const totalPages = Math.ceil(allUsers.length / ITEMS_PER_PAGE);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
   const handleAddUser = () => {
     setEditingUser(null);
@@ -100,8 +129,19 @@ export default function UsersPage() {
       return;
     }
     setIsSubmitting(true);
-    setTimeout(() => {
-        setUsers(prev => prev.filter(u => u.id !== id));
+    setTimeout(() => { // Simulate API call
+        setAllUsers(prev => {
+          const updatedUsers = prev.filter(u => u.id !== id);
+          // After updating allUsers, pagination effect will re-calculate paginatedUsers
+          // If deleting the last item on a page makes the page empty, adjust currentPage
+          const newTotalPages = Math.ceil(updatedUsers.length / ITEMS_PER_PAGE);
+          if (currentPage > newTotalPages && newTotalPages > 0) {
+            setCurrentPage(newTotalPages);
+          } else if (newTotalPages === 0) {
+            setCurrentPage(1);
+          }
+          return updatedUsers;
+        });
         toast({ title: "Usuário Removido!", description: "O registro do usuário foi removido." });
         setIsSubmitting(false);
     }, 500);
@@ -130,11 +170,10 @@ export default function UsersPage() {
       return;
     }
 
-    setTimeout(() => {
+    setTimeout(() => { // Simulate API call
         if (editingUser) {
-          // Verifica se o email está sendo alterado e se o novo email já existe (excluindo o usuário atual)
           if (formData.email.toLowerCase() !== editingUser.email.toLowerCase()) {
-            const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser.id);
+            const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser.id);
             if (emailExists) {
               toast({
                 variant: "destructive",
@@ -151,11 +190,10 @@ export default function UsersPage() {
             email: formData.email,
             accessLevel: formData.accessLevel,
           };
-          setUsers(prev => prev.map(u => u.id === editingUser.id ? updatedUser : u));
+          setAllUsers(prev => prev.map(u => u.id === editingUser.id ? updatedUser : u));
           toast({ title: "Usuário Atualizado!", description: "Os dados do usuário foram atualizados." });
         } else {
-          // Verifica se o email já existe para novo usuário
-          const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase());
+          const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase());
           if (emailExists) {
             toast({
               variant: "destructive",
@@ -166,12 +204,12 @@ export default function UsersPage() {
             return;
           }
           const newUser: SystemUser = {
-            id: String(Date.now()),
+            id: String(Date.now()), // Simple ID generation for mock data
             name: formData.name,
             email: formData.email,
             accessLevel: formData.accessLevel,
           };
-          setUsers(prev => [...prev, newUser]);
+          setAllUsers(prev => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name))); // Keep sorted for consistency
           toast({ title: "Usuário Adicionado!", description: "Novo usuário cadastrado com sucesso." });
         }
         setIsFormOpen(false);
@@ -206,7 +244,7 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
@@ -227,7 +265,37 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
-          {users.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhum usuário cadastrado.</p>}
+          {paginatedUsers.length === 0 && allUsers.length > 0 && (
+            <p className="text-center text-muted-foreground py-4">Nenhum usuário encontrado para esta página.</p>
+          )}
+          {allUsers.length === 0 && (
+            <p className="text-center text-muted-foreground py-4">Nenhum usuário cadastrado.</p>
+          )}
+          {totalPages > 0 && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -307,3 +375,5 @@ export default function UsersPage() {
     </div>
   );
 }
+
+    

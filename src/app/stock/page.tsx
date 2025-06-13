@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, MinusCircle, Loader2 } from "lucide-react";
+import { PlusCircle, MinusCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -50,9 +50,13 @@ import { revalidateStockRelatedPages } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
 
 const movementOrigins = ["Manual", "Venda", "Ajuste", "Perda"];
+const ITEMS_PER_PAGE = 10;
 
 export default function StockPage() {
-  const [stockMovements, setStockMovements] = useState<StockMovementEntry[]>([]);
+  const [allStockMovementsCache, setAllStockMovementsCache] = useState<StockMovementEntry[]>([]);
+  const [paginatedStockMovements, setPaginatedStockMovements] = useState<StockMovementEntry[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +66,7 @@ export default function StockPage() {
   const initialFormData: StockMovementFormData = {
     type: 'INPUT',
     origin: 'Manual',
-    quantity: 1, // Default to 1
+    quantity: 1, 
     notes: '',
   };
   const [formData, setFormData] = useState<StockMovementFormData>(initialFormData);
@@ -77,10 +81,11 @@ export default function StockPage() {
         return {
           id: docSnap.id,
           ...data,
-          createdAt: data.createdAt as Timestamp, // Assuming createdAt is always a Timestamp
+          createdAt: data.createdAt as Timestamp, 
         } as StockMovementEntry;
       });
-      setStockMovements(movementsData);
+      setAllStockMovementsCache(movementsData);
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error fetching stock movements: ", error);
       toast({
@@ -97,7 +102,23 @@ export default function StockPage() {
     fetchStockMovements();
   }, [toast]);
 
-  const currentStockLevel = stockMovements.reduce((acc, mov) => {
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setPaginatedStockMovements(allStockMovementsCache.slice(startIndex, endIndex));
+  }, [allStockMovementsCache, currentPage]);
+
+  const totalPages = Math.ceil(allStockMovementsCache.length / ITEMS_PER_PAGE);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+  
+  const currentStockLevel = allStockMovementsCache.reduce((acc, mov) => {
     return mov.type === "INPUT" ? acc + mov.quantity : acc - mov.quantity;
   }, 0);
 
@@ -183,36 +204,68 @@ export default function StockPage() {
               <p className="ml-2 text-muted-foreground">Carregando histórico...</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Origem</TableHead>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Quantidade</TableHead>
-                  <TableHead>Ref. Venda</TableHead>
-                  <TableHead>Observações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stockMovements.map((mov) => (
-                  <TableRow key={mov.id}>
-                    <TableCell>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${mov.type === "INPUT" ? "bg-success/80 text-success-foreground" : "bg-destructive/80 text-destructive-foreground"}`}>
-                        {mov.type === "INPUT" ? "Entrada" : "Saída"}
-                      </span>
-                    </TableCell>
-                    <TableCell>{mov.origin}</TableCell>
-                    <TableCell>{format(mov.createdAt.toDate(), "dd/MM/yyyy HH:mm")}</TableCell>
-                    <TableCell>{mov.quantity}</TableCell>
-                    <TableCell>{mov.relatedSaleId || "N/A"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={mov.notes || undefined}>{mov.notes || "N/A"}</TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Data/Hora</TableHead>
+                    <TableHead>Quantidade</TableHead>
+                    <TableHead>Ref. Venda</TableHead>
+                    <TableHead>Observações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedStockMovements.map((mov) => (
+                    <TableRow key={mov.id}>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${mov.type === "INPUT" ? "bg-success/80 text-success-foreground" : "bg-destructive/80 text-destructive-foreground"}`}>
+                          {mov.type === "INPUT" ? "Entrada" : "Saída"}
+                        </span>
+                      </TableCell>
+                      <TableCell>{mov.origin}</TableCell>
+                      <TableCell>{format(mov.createdAt.toDate(), "dd/MM/yyyy HH:mm")}</TableCell>
+                      <TableCell>{mov.quantity}</TableCell>
+                      <TableCell>{mov.relatedSaleId || "N/A"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={mov.notes || undefined}>{mov.notes || "N/A"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {!isLoading && paginatedStockMovements.length === 0 && allStockMovementsCache.length > 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhuma movimentação encontrada para esta página.</p>
+              )}
+              {!isLoading && allStockMovementsCache.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhuma movimentação de estoque registrada.</p>
+              )}
+              {!isLoading && totalPages > 0 && (
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-           {(!isLoading && stockMovements.length === 0) && <p className="text-center text-muted-foreground py-4">Nenhuma movimentação de estoque registrada.</p>}
         </CardContent>
       </Card>
 
@@ -277,3 +330,5 @@ export default function StockPage() {
     </div>
   );
 }
+
+    

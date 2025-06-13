@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Edit, PlusCircle, Filter, Loader2, Trash2 } from "lucide-react";
+import { CheckCircle, Edit, PlusCircle, Filter, Loader2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -57,11 +57,14 @@ import { revalidateDefaultsRelatedPages } from "./actions";
 import type { Customer } from "../customers/actions";
 import { useAuth } from "@/contexts/auth-context";
 
-
 const paymentStatuses = ["Pending", "Paid"];
+const ITEMS_PER_PAGE = 10;
 
 export default function DefaultsPage() {
-  const [defaults, setDefaults] = useState<DefaultEntry[]>([]);
+  const [allDefaultsCache, setAllDefaultsCache] = useState<DefaultEntry[]>([]);
+  const [paginatedDefaults, setPaginatedDefaults] = useState<DefaultEntry[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -73,8 +76,8 @@ export default function DefaultsPage() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const initialFormData = useMemo((): DefaultFormData => ({
-    customerId: null, // Customer is now required
-    customerName: '',   // Will be derived from selected customer
+    customerId: null, 
+    customerName: '',   
     value: 0,
     dueDate: new Date(),
     paymentStatus: 'Pending',
@@ -97,7 +100,8 @@ export default function DefaultsPage() {
           createdAt: data.createdAt,
         } as DefaultEntry;
       });
-      setDefaults(defaultsData);
+      setAllDefaultsCache(defaultsData);
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error fetching defaults: ", error);
       toast({
@@ -133,6 +137,22 @@ export default function DefaultsPage() {
     };
     fetchCustomersData();
   }, [toast]);
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setPaginatedDefaults(allDefaultsCache.slice(startIndex, endIndex));
+  }, [allDefaultsCache, currentPage]);
+
+  const totalPages = Math.ceil(allDefaultsCache.length / ITEMS_PER_PAGE);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
   useEffect(() => {
     if (isFormOpen) {
@@ -245,7 +265,7 @@ export default function DefaultsPage() {
 
     const payload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any } = {
       customerId: formData.customerId,
-      customerName: selectedCustomer.name, // Derived from selected customer
+      customerName: selectedCustomer.name, 
       value: parseFloat(String(formData.value)) || 0,
       dueDate: Timestamp.fromDate(formData.dueDate),
       paymentStatus: formData.paymentStatus,
@@ -317,46 +337,78 @@ export default function DefaultsPage() {
               <p className="ml-2 text-muted-foreground">Carregando pendências...</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {defaults.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.customerName}</TableCell>
-                    <TableCell>{formatCurrency(item.value)}</TableCell>
-                    <TableCell>{format(item.dueDate, "dd/MM/yyyy")}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 text-xs rounded-full ${item.paymentStatus === "Paid" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
-                        {item.paymentStatus === "Paid" ? "Pago" : "Pendente"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.paymentStatus === "Pending" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleMarkAsPaid(item.id)} className="hover:text-success" title="Marcar como Pago" disabled={isSubmitting}>
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" onClick={() => handleEditDefault(item)} className="hover:text-accent" disabled={isSubmitting}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                       <Button variant="ghost" size="icon" onClick={() => handleDeleteDefault(item.id)} className="hover:text-destructive" disabled={isSubmitting}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedDefaults.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.customerName}</TableCell>
+                      <TableCell>{formatCurrency(item.value)}</TableCell>
+                      <TableCell>{format(item.dueDate, "dd/MM/yyyy")}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${item.paymentStatus === "Paid" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+                          {item.paymentStatus === "Paid" ? "Pago" : "Pendente"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {item.paymentStatus === "Pending" && (
+                          <Button variant="ghost" size="icon" onClick={() => handleMarkAsPaid(item.id)} className="hover:text-success" title="Marcar como Pago" disabled={isSubmitting}>
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => handleEditDefault(item)} className="hover:text-accent" disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteDefault(item.id)} className="hover:text-destructive" disabled={isSubmitting}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {!isLoading && paginatedDefaults.length === 0 && allDefaultsCache.length > 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhuma pendência encontrada para esta página.</p>
+              )}
+              {!isLoading && allDefaultsCache.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhuma pendência registrada.</p>
+              )}
+              {!isLoading && totalPages > 0 && (
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-          {!isLoading && defaults.length === 0 && <p className="text-center text-muted-foreground py-4">Nenhuma pendência registrada.</p>}
         </CardContent>
       </Card>
 
@@ -473,3 +525,4 @@ export default function DefaultsPage() {
   );
 }
 
+    

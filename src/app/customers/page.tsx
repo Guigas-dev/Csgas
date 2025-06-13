@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -43,12 +43,13 @@ import {
 import type { Customer, CustomerFormData } from "./actions";
 import { revalidateCustomersPage } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
-// import { format } from "date-fns"; // Not strictly needed if no dates displayed here anymore, but kept for safety
-// import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Removed for AI prediction
 
+const ITEMS_PER_PAGE = 10;
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomersCache, setAllCustomersCache] = useState<Customer[]>([]);
+  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +57,7 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
-  const initialFormData: CustomerFormData = { 
+  const initialFormData: CustomerFormData = useMemo(() => ({ 
     name: '', 
     cpf: '', 
     street: '',
@@ -64,27 +65,25 @@ export default function CustomersPage() {
     neighborhood: '',
     referencePoint: '',
     phone: ''
-  };
+  }), []);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
 
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "customers"), orderBy("name", "asc")); // Order by name
+      const q = query(collection(db, "customers"), orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const customersData = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return { 
           id: docSnap.id, 
           ...data,
-          // Ensure Timestamps are converted if they exist
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-          // data_prevista_proxima_compra: data.data_prevista_proxima_compra, // Removed AI field
-          // prediction_reasoning: data.prediction_reasoning, // Removed AI field
         } as Customer;
       });
-      setCustomers(customersData);
+      setAllCustomersCache(customersData);
+      setCurrentPage(1); // Reset to first page on new fetch
     } catch (error) {
       console.error("Error fetching customers: ", error);
       toast({
@@ -100,6 +99,22 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
   }, [toast]); 
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setPaginatedCustomers(allCustomersCache.slice(startIndex, endIndex));
+  }, [allCustomersCache, currentPage]);
+
+  const totalPages = Math.ceil(allCustomersCache.length / ITEMS_PER_PAGE);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -234,80 +249,70 @@ export default function CustomersPage() {
               <p className="ml-2 text-muted-foreground">Carregando clientes...</p>
             </div>
           ) : (
-            // <TooltipProvider> // Removed TooltipProvider for AI
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>Endereço</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  {/* <TableHead>Próx. Compra (IA)</TableHead> // Removed AI column */}
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.cpf}</TableCell>
-                    <TableCell>
-                      {`${customer.street || ''}${customer.number ? `, ${customer.number}` : ''}${customer.neighborhood ? ` - ${customer.neighborhood}` : ''}` || 'N/A'}
-                    </TableCell>
-                    <TableCell>{customer.phone}</TableCell>
-                    {/* <TableCell> // Removed AI cell content
-                      {customer.data_prevista_proxima_compra ? (
-                        isValidDateString(customer.data_prevista_proxima_compra) ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-default flex items-center">
-                                {format(new Date(customer.data_prevista_proxima_compra as string), "dd/MM/yy")}
-                                {customer.prediction_reasoning && <Info className="h-3 w-3 ml-1 text-muted-foreground" />}
-                              </span>
-                            </TooltipTrigger>
-                            {customer.prediction_reasoning && (
-                              <TooltipContent className="bg-popover text-popover-foreground max-w-xs p-2">
-                                <p className="text-xs font-medium">Raciocínio da IA:</p>
-                                <p className="text-xs">{customer.prediction_reasoning}</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        ) : (
-                           <Tooltip>
-                            <TooltipTrigger asChild>
-                               <span className="cursor-default flex items-center">
-                                {customer.data_prevista_proxima_compra}
-                                {customer.prediction_reasoning && <Info className="h-3 w-3 ml-1 text-muted-foreground" />}
-                               </span>
-                            </TooltipTrigger>
-                            {customer.prediction_reasoning && (
-                              <TooltipContent className="bg-popover text-popover-foreground max-w-xs p-2">
-                                <p className="text-xs font-medium">Raciocínio da IA:</p>
-                                <p className="text-xs">{customer.prediction_reasoning}</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        )
-                      ) : (
-                        "N/D" 
-                      )}
-                    </TableCell> */}
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-accent" disabled={isSubmitting}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)} className="hover:text-destructive" disabled={isSubmitting}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>CPF</TableHead>
+                    <TableHead>Endereço</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            // </TooltipProvider> // Removed TooltipProvider for AI
-          )}
-          {!isLoading && customers.length === 0 && (
-            <p className="text-center text-muted-foreground py-4">Nenhum cliente cadastrado.</p>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell>{customer.cpf}</TableCell>
+                      <TableCell>
+                        {`${customer.street || ''}${customer.number ? `, ${customer.number}` : ''}${customer.neighborhood ? ` - ${customer.neighborhood}` : ''}` || 'N/A'}
+                      </TableCell>
+                      <TableCell>{customer.phone}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-accent" disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)} className="hover:text-destructive" disabled={isSubmitting}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {!isLoading && paginatedCustomers.length === 0 && allCustomersCache.length > 0 && (
+                 <p className="text-center text-muted-foreground py-4">Nenhum cliente encontrado para esta página.</p>
+              )}
+              {!isLoading && allCustomersCache.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhum cliente cadastrado.</p>
+              )}
+              {!isLoading && totalPages > 0 && (
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -371,3 +376,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
