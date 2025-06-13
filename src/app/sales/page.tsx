@@ -110,6 +110,7 @@ export default function SalesPage() {
 
   const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [saleMode, setSaleMode] = useState<'quick' | 'customer' | null>(null);
 
   const initialFilterCriteria: SalesFilterCriteria = useMemo(() => ({
     customerName: '',
@@ -123,7 +124,7 @@ export default function SalesPage() {
 
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
-    customerName: "Consumidor Final",
+    customerName: "Consumidor Final", // Default, will be '' for quick sale input
     value: 0,
     paymentMethod: paymentMethods[0] || '',
     date: new Date(),
@@ -184,7 +185,7 @@ export default function SalesPage() {
         } as Sale;
       });
       setAllSalesCache(salesData);
-      applyFilters(salesData, filterCriteria); // Apply initial/current filters
+      applyFilters(salesData, filterCriteria); 
     } catch (error) {
       console.error("Error fetching sales: ", error);
       toast({
@@ -231,10 +232,11 @@ export default function SalesPage() {
 
   useEffect(() => {
     if (isFormOpen && editingSale) {
+      // saleMode is set in handleEditSale
       const customer = customers.find(c => c.id === editingSale.customerId);
       setFormData({
         customerId: editingSale.customerId || null,
-        customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
+        customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : ""), // Empty if quick sale name
         value: editingSale.value,
         paymentMethod: editingSale.paymentMethod,
         date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
@@ -245,7 +247,7 @@ export default function SalesPage() {
         subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
       });
     }
-  }, [isFormOpen, editingSale, customers]);
+  }, [isFormOpen, editingSale, customers]); // Removed saleMode from deps here, it's set before formData
 
   useEffect(() => {
     if (formData.status !== 'Pending') {
@@ -259,10 +261,11 @@ export default function SalesPage() {
 
   const handleInitiateQuickSale = () => {
     setEditingSale(null);
+    setSaleMode('quick');
     setFormData({
       ...initialFormData,
       customerId: null, 
-      customerName: "Consumidor Final",
+      customerName: "", // Empty for the input field
       date: new Date(), 
       paymentDueDate: null, 
     });
@@ -272,10 +275,11 @@ export default function SalesPage() {
 
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
+    setSaleMode('customer');
     setFormData({ 
       ...initialFormData, 
       customerId: null, 
-      customerName: "Consumidor Final", 
+      customerName: "Consumidor Final", // Default for selection
       date: new Date(), 
       paymentDueDate: null, 
     });
@@ -286,6 +290,8 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
+    setSaleMode(sale.customerId ? 'customer' : 'quick'); // Infer mode for form display
+    // formData will be set by the useEffect watching editingSale and isFormOpen
     setIsFormOpen(true);
   };
 
@@ -335,12 +341,22 @@ export default function SalesPage() {
       return;
     }
     setIsSubmitting(true);
+    
+    const payloadCustomerId = formData.customerId || null;
+    let payloadCustomerName = formData.customerName || ""; 
 
-    const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
+    if (payloadCustomerId) { 
+      const selectedCust = customers.find(c => c.id === payloadCustomerId);
+      payloadCustomerName = selectedCust ? selectedCust.name : "Cliente Desconhecido";
+    } else { 
+      if (payloadCustomerName.trim() === "") {
+        payloadCustomerName = "Consumidor Final";
+      }
+    }
     
     const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date' | 'paymentDueDate'> & { date: Timestamp, paymentDueDate: Timestamp | null, createdAt?: any, updatedAt?: any } = {
-      customerId: formData.customerId || null,
-      customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === CONSUMIDOR_FINAL_SELECT_VALUE || !formData.customerId ? "Consumidor Final" : (customers.find(c=>c.id === formData.customerId)?.name || "Cliente não encontrado")),
+      customerId: payloadCustomerId,
+      customerName: payloadCustomerName.trim(),
       value: parseFloat(String(formData.value)) || 0,
       paymentMethod: formData.paymentMethod,
       date: Timestamp.fromDate(formData.date),
@@ -442,7 +458,7 @@ export default function SalesPage() {
 
   const handleClearFilters = () => {
     setFilterCriteria(initialFilterCriteria);
-    applyFilters(allSalesCache, initialFilterCriteria); // Apply to allSalesCache with initial (empty) criteria
+    applyFilters(allSalesCache, initialFilterCriteria); 
     setIsFilterSheetOpen(false);
   };
 
@@ -455,6 +471,8 @@ export default function SalesPage() {
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   };
+
+  const showQuickSaleNameField = (saleMode === 'quick' && !editingSale) || (editingSale && !editingSale.customerId);
 
   return (
     <div>
@@ -599,44 +617,70 @@ export default function SalesPage() {
       <Sheet open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) setIsFormOpen(open); }}>
         <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
           <SheetHeader>
-            <SheetTitle className="text-foreground">{editingSale ? "Editar Venda" : "Detalhes da Venda"}</SheetTitle>
+            <SheetTitle className="text-foreground">
+                 {editingSale
+                    ? `Editar Venda ${editingSale.customerId ? '(Cliente)' : '(Rápida)'}`
+                    : saleMode === 'quick'
+                    ? "Nova Venda Rápida"
+                    : "Nova Venda para Cliente"}
+            </SheetTitle>
             <SheetDescription>
               {editingSale ? "Atualize os detalhes da transação." : "Preencha os detalhes da nova transação."}
             </SheetDescription>
           </SheetHeader>
           <ScrollArea className="flex-grow">
             <form onSubmit={handleFormSubmit} id="sale-form" className="py-4 pr-6 space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
-                    onValueChange={val => {
-                        const selectedCust = customers.find(c => c.id === val);
-                        setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
-                    }}
-                    disabled={isSubmitting || isLoadingCustomers}
-                  >
-                    <SelectTrigger className="w-full bg-input text-foreground">
-                      <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
-                      {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    className="flex-shrink-0" 
-                    onClick={() => router.push('/customers')} 
+              
+              {showQuickSaleNameField ? (
+                <div className="space-y-1">
+                  <Label htmlFor="quickSaleCustomerName" className="text-muted-foreground">Nome (Consumidor Final)</Label>
+                  <Input
+                    id="quickSaleCustomerName"
+                    value={formData.customerName}
+                    onChange={e => setFormData({...formData, customerName: e.target.value, customerId: null})} // Ensure customerId is null
+                    className="bg-input text-foreground"
+                    placeholder="Nome do cliente (opcional)"
                     disabled={isSubmitting}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                  </Button>
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
+                      onValueChange={val => {
+                          const selectedCust = customers.find(c => c.id === val);
+                          setFormData({
+                            ...formData, 
+                            customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, 
+                            customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")
+                          })
+                      }}
+                      disabled={isSubmitting || isLoadingCustomers}
+                    >
+                      <SelectTrigger className="w-full bg-input text-foreground">
+                        <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
+                        {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="icon" 
+                      className="flex-shrink-0" 
+                      onClick={() => router.push('/customers')} 
+                      disabled={isSubmitting}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
 
               <div className="space-y-1">
                 <Label htmlFor="date" className="text-muted-foreground">Data da Venda</Label>
@@ -894,3 +938,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
