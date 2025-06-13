@@ -297,7 +297,7 @@ export default function DashboardPage() {
     <div className="container mx-auto">
       <PageHeader title="Dashboard" description="Visão geral do seu negócio." />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <KpiCard
           title="Vendas Totais (Mês)"
           value={totalSalesMonth}
@@ -335,7 +335,7 @@ export default function DashboardPage() {
           valueColor={isLoadingStock ? "text-foreground" : (isStockLow ? "text-yellow-500" : "text-foreground")}
           subText={
             isLoadingStock 
-              ? undefined // KpiCard handles loading subtext display internally
+              ? undefined
               : currentStockLevel !== null 
                 ? `${currentStockLevel}/${maxStock} unidades ${isStockLow ? " - Atenção!" : ""}` 
                 : `0/${maxStock} unidades`
