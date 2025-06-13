@@ -86,8 +86,8 @@ const ITEMS_PER_PAGE = 10;
 
 interface SalesFilterCriteria {
   customerName: string;
-  status: string; // "All", "Paid", "Pending", "Overdue"
-  paymentMethod: string; // "All", "Pix", ...
+  status: string; 
+  paymentMethod: string; 
   startDate: Date | null;
   endDate: Date | null;
 }
@@ -111,6 +111,7 @@ export default function SalesPage() {
   const [isSaleTypeDialogOpen, setIsSaleTypeDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [saleMode, setSaleMode] = useState<'quick' | 'customer' | null>(null);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const initialFilterCriteria: SalesFilterCriteria = useMemo(() => ({
     customerName: '',
@@ -124,7 +125,7 @@ export default function SalesPage() {
 
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
-    customerName: "Consumidor Final", // Default, will be '' for quick sale input
+    customerName: "Consumidor Final", 
     value: 0,
     paymentMethod: paymentMethods[0] || '',
     date: new Date(),
@@ -231,23 +232,44 @@ export default function SalesPage() {
 
 
   useEffect(() => {
-    if (isFormOpen && editingSale) {
-      // saleMode is set in handleEditSale
-      const customer = customers.find(c => c.id === editingSale.customerId);
-      setFormData({
-        customerId: editingSale.customerId || null,
-        customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : ""), // Empty if quick sale name
-        value: editingSale.value,
-        paymentMethod: editingSale.paymentMethod,
-        date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
-        status: editingSale.status,
-        paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
-        gasCanistersQuantity: editingSale.gasCanistersQuantity,
-        observations: editingSale.observations || '',
-        subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
-      });
+    if (isFormOpen) {
+      setCustomerSearchTerm(''); 
+      if (editingSale) {
+        setSaleMode(editingSale.customerId ? 'customer' : 'quick');
+        const customer = customers.find(c => c.id === editingSale.customerId);
+        setFormData({
+          customerId: editingSale.customerId || null,
+          customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "Cliente não encontrado") : ""),
+          value: editingSale.value,
+          paymentMethod: editingSale.paymentMethod,
+          date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
+          status: editingSale.status,
+          paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
+          gasCanistersQuantity: editingSale.gasCanistersQuantity,
+          observations: editingSale.observations || '',
+          subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
+        });
+      } else {
+         if (saleMode === 'quick') {
+            setFormData({
+                ...initialFormData,
+                customerId: null,
+                customerName: "", 
+                date: new Date(),
+                paymentDueDate: null,
+            });
+        } else { // customer mode or null (default to customer for new non-quick sales)
+            setFormData({
+                ...initialFormData,
+                customerId: null,
+                customerName: "Consumidor Final", 
+                date: new Date(),
+                paymentDueDate: null,
+            });
+        }
+      }
     }
-  }, [isFormOpen, editingSale, customers]); // Removed saleMode from deps here, it's set before formData
+  }, [isFormOpen, editingSale, customers, initialFormData, saleMode]);
 
   useEffect(() => {
     if (formData.status !== 'Pending') {
@@ -262,13 +284,7 @@ export default function SalesPage() {
   const handleInitiateQuickSale = () => {
     setEditingSale(null);
     setSaleMode('quick');
-    setFormData({
-      ...initialFormData,
-      customerId: null, 
-      customerName: "", // Empty for the input field
-      date: new Date(), 
-      paymentDueDate: null, 
-    });
+    // FormData set by useEffect watching isFormOpen & saleMode
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
   };
@@ -276,13 +292,7 @@ export default function SalesPage() {
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
     setSaleMode('customer');
-    setFormData({ 
-      ...initialFormData, 
-      customerId: null, 
-      customerName: "Consumidor Final", // Default for selection
-      date: new Date(), 
-      paymentDueDate: null, 
-    });
+     // FormData set by useEffect watching isFormOpen & saleMode
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
   };
@@ -290,8 +300,7 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    setSaleMode(sale.customerId ? 'customer' : 'quick'); // Infer mode for form display
-    // formData will be set by the useEffect watching editingSale and isFormOpen
+    // saleMode and formData will be set by the useEffect watching editingSale and isFormOpen
     setIsFormOpen(true);
   };
 
@@ -474,6 +483,13 @@ export default function SalesPage() {
 
   const showQuickSaleNameField = (saleMode === 'quick' && !editingSale) || (editingSale && !editingSale.customerId);
 
+  const filteredCustomersForSelect = useMemo(() => {
+    if (!customerSearchTerm) return customers;
+    return customers.filter(customer =>
+        customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
+    );
+  }, [customers, customerSearchTerm]);
+
   return (
     <div>
       <PageHeader
@@ -637,7 +653,7 @@ export default function SalesPage() {
                   <Input
                     id="quickSaleCustomerName"
                     value={formData.customerName}
-                    onChange={e => setFormData({...formData, customerName: e.target.value, customerId: null})} // Ensure customerId is null
+                    onChange={e => setFormData({...formData, customerName: e.target.value, customerId: null})} 
                     className="bg-input text-foreground"
                     placeholder="Nome do cliente (opcional)"
                     disabled={isSubmitting}
@@ -655,7 +671,13 @@ export default function SalesPage() {
                             ...formData, 
                             customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, 
                             customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")
-                          })
+                          });
+                          setCustomerSearchTerm(''); // Clear search on selection
+                      }}
+                      onOpenChange={(isOpen) => {
+                        if (!isOpen) {
+                            setCustomerSearchTerm(''); // Clear search on close
+                        }
                       }}
                       disabled={isSubmitting || isLoadingCustomers}
                     >
@@ -663,8 +685,25 @@ export default function SalesPage() {
                         <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
                       </SelectTrigger>
                       <SelectContent>
+                        <div className="p-2 sticky top-0 bg-popover z-10">
+                            <Input
+                                placeholder="Pesquisar cliente..."
+                                value={customerSearchTerm}
+                                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                                className="mb-2 bg-input text-foreground"
+                                onClick={(e) => e.stopPropagation()} // Prevent closing popover on input click
+                            />
+                        </div>
                         <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
-                        {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {isLoadingCustomers ? (
+                            <div className="p-2 text-center text-muted-foreground">Carregando clientes...</div>
+                        ) : customers.length === 0 && !customerSearchTerm ? (
+                             <div className="p-2 text-center text-muted-foreground">Nenhum cliente cadastrado.</div>
+                        ) : filteredCustomersForSelect.length === 0 && customerSearchTerm ? (
+                            <div className="p-2 text-center text-muted-foreground">Nenhum cliente encontrado para "{customerSearchTerm}".</div>
+                        ): (
+                            filteredCustomersForSelect.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
+                        )}
                       </SelectContent>
                     </Select>
                     <Button 
