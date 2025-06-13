@@ -81,7 +81,6 @@ const saleStatuses = [
     { value: "Overdue", label: "Atrasado"}
 ];
 
-const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
 const ITEMS_PER_PAGE = 10;
 
 interface SalesFilterCriteria {
@@ -258,11 +257,11 @@ export default function SalesPage() {
                 date: new Date(),
                 paymentDueDate: null,
             });
-        } else { // customer mode or null (default to customer for new non-quick sales)
+        } else { 
             setFormData({
                 ...initialFormData,
                 customerId: null,
-                customerName: "Consumidor Final", 
+                customerName: "", 
                 date: new Date(),
                 paymentDueDate: null,
             });
@@ -284,7 +283,6 @@ export default function SalesPage() {
   const handleInitiateQuickSale = () => {
     setEditingSale(null);
     setSaleMode('quick');
-    // FormData set by useEffect watching isFormOpen & saleMode
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
   };
@@ -292,7 +290,6 @@ export default function SalesPage() {
   const handleInitiateRegisteredCustomerSale = () => {
     setEditingSale(null);
     setSaleMode('customer');
-     // FormData set by useEffect watching isFormOpen & saleMode
     setIsFormOpen(true);
     setIsSaleTypeDialogOpen(false);
   };
@@ -300,7 +297,6 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    // saleMode and formData will be set by the useEffect watching editingSale and isFormOpen
     setIsFormOpen(true);
   };
 
@@ -664,25 +660,25 @@ export default function SalesPage() {
                   <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                   <div className="flex items-center gap-2">
                     <Select
-                      value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
+                      value={formData.customerId || ""}
                       onValueChange={val => {
                           const selectedCust = customers.find(c => c.id === val);
                           setFormData({
                             ...formData, 
-                            customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, 
-                            customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")
+                            customerId: val, 
+                            customerName: selectedCust?.name || ""
                           });
-                          setCustomerSearchTerm(''); // Clear search on selection
+                          setCustomerSearchTerm('');
                       }}
                       onOpenChange={(isOpen) => {
                         if (!isOpen) {
-                            setCustomerSearchTerm(''); // Clear search on close
+                            setCustomerSearchTerm('');
                         }
                       }}
                       disabled={isSubmitting || isLoadingCustomers}
                     >
                       <SelectTrigger className="w-full bg-input text-foreground">
-                        <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
+                        <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : (customers.length === 0 ? "Nenhum cliente cadastrado" : "Selecione um cliente")} />
                       </SelectTrigger>
                       <SelectContent>
                         <div className="p-2 sticky top-0 bg-popover z-10">
@@ -691,13 +687,12 @@ export default function SalesPage() {
                                 value={customerSearchTerm}
                                 onChange={(e) => setCustomerSearchTerm(e.target.value)}
                                 className="mb-2 bg-input text-foreground"
-                                onClick={(e) => e.stopPropagation()} // Prevent closing popover on input click
+                                onClick={(e) => e.stopPropagation()} 
                             />
                         </div>
-                        <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
                         {isLoadingCustomers ? (
                             <div className="p-2 text-center text-muted-foreground">Carregando clientes...</div>
-                        ) : customers.length === 0 && !customerSearchTerm ? (
+                        ) : customers.length === 0 ? (
                              <div className="p-2 text-center text-muted-foreground">Nenhum cliente cadastrado.</div>
                         ) : filteredCustomersForSelect.length === 0 && customerSearchTerm ? (
                             <div className="p-2 text-center text-muted-foreground">Nenhum cliente encontrado para "{customerSearchTerm}".</div>
