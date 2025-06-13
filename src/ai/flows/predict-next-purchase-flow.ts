@@ -16,7 +16,7 @@ const SalesRecordSchema = z.object({
   quantity: z.number().describe("Quantity of gas canisters sold."),
 });
 
-export const PredictNextPurchaseInputSchema = z.object({
+const PredictNextPurchaseInputSchema = z.object({
   customerId: z.string().describe("The ID of the customer."),
   salesHistory: z.array(SalesRecordSchema)
     .min(1, { message: "At least one sales record is required to make a prediction." })
@@ -24,7 +24,7 @@ export const PredictNextPurchaseInputSchema = z.object({
 });
 export type PredictNextPurchaseInput = z.infer<typeof PredictNextPurchaseInputSchema>;
 
-export const PredictNextPurchaseOutputSchema = z.object({
+const PredictNextPurchaseOutputSchema = z.object({
   predictedNextPurchaseDate: z.string()
     .describe("The predicted next purchase date in YYYY-MM-DD format. If prediction is not possible (e.g., insufficient data), provide a descriptive text like 'Incerta' or 'Dados insuficientes'."),
   reasoning: z.string().describe("A brief explanation of how the prediction was derived, or why it's uncertain/not possible."),
