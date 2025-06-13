@@ -339,7 +339,7 @@ export default function DashboardPage() {
             <Flame className="mr-2 h-5 w-5 text-foreground" /> Preços do Gás
           </CardTitle>
           {!isEditingPrices && (
-            <Button onClick={handleEditPrices} variant="ghost" size="sm">
+            <Button onClick={handleEditPrices} variant="ghost" size="sm" className="text-muted-foreground">
               <Edit className="mr-2 h-4 w-4" /> Editar
             </Button>
           )}
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                   <Archive className="mr-2 h-5 w-5 text-foreground" />
                   Nível de Estoque
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
                   <Link href="/stock">Ver Detalhes <ArrowRight className="ml-1 h-3 w-3"/></Link>
                 </Button>
               </div>
@@ -612,7 +612,7 @@ export default function DashboardPage() {
                   <UserX className="mr-2 h-5 w-5 text-foreground" />
                   Clientes Inadimplentes
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
                   <Link href="/defaults">Ver Todos <ArrowRight className="ml-1 h-3 w-3"/></Link>
                 </Button>
               </div>
@@ -658,7 +658,7 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl text-foreground">Vendas Recentes</CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs text-accent hover:text-accent/80" asChild>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
                   <Link href="/sales">Ver Todas <ArrowRight className="ml-1 h-3 w-3"/></Link>
                 </Button>
               </div>
@@ -702,3 +702,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
