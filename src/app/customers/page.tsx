@@ -53,7 +53,15 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
-  const initialFormData: CustomerFormData = { name: '', cpf: '', address: '', phone: ''};
+  const initialFormData: CustomerFormData = { 
+    name: '', 
+    cpf: '', 
+    street: '',
+    number: '',
+    neighborhood: '',
+    referencePoint: '',
+    phone: ''
+  };
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
 
   const fetchCustomers = async () => {
@@ -95,7 +103,15 @@ export default function CustomersPage() {
 
   const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
-    setFormData({ name: customer.name, cpf: customer.cpf, address: customer.address, phone: customer.phone });
+    setFormData({ 
+      name: customer.name, 
+      cpf: customer.cpf, 
+      street: customer.street || '',
+      number: customer.number || '',
+      neighborhood: customer.neighborhood || '',
+      referencePoint: customer.referencePoint || '',
+      phone: customer.phone 
+    });
     setIsFormOpen(true);
   };
   
@@ -229,7 +245,9 @@ export default function CustomersPage() {
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.cpf}</TableCell>
-                    <TableCell>{customer.address}</TableCell>
+                    <TableCell>
+                      {`${customer.street || ''}${customer.number ? `, ${customer.number}` : ''}${customer.neighborhood ? ` - ${customer.neighborhood}` : ''}` || 'N/A'}
+                    </TableCell>
                     <TableCell>{customer.phone}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-accent" disabled={isSubmitting}>
@@ -273,10 +291,20 @@ export default function CustomersPage() {
                 <Input id="cpf" value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="address" className="text-muted-foreground">
-                  Endereço
-                </Label>
-                <Input id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-input text-foreground" disabled={isSubmitting}/>
+                <Label htmlFor="neighborhood" className="text-muted-foreground">Bairro</Label>
+                <Input id="neighborhood" value={formData.neighborhood} onChange={e => setFormData({...formData, neighborhood: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="street" className="text-muted-foreground">Rua</Label>
+                <Input id="street" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="number" className="text-muted-foreground">Número</Label>
+                <Input id="number" value={formData.number} onChange={e => setFormData({...formData, number: e.target.value})} className="bg-input text-foreground" required disabled={isSubmitting}/>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="referencePoint" className="text-muted-foreground">Ponto de Referência (Opcional)</Label>
+                <Input id="referencePoint" value={formData.referencePoint || ''} onChange={e => setFormData({...formData, referencePoint: e.target.value})} className="bg-input text-foreground" disabled={isSubmitting}/>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="phone" className="text-muted-foreground">
@@ -299,3 +327,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

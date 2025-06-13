@@ -7,7 +7,10 @@ import { revalidatePath } from 'next/cache';
 export interface CustomerFormData {
   name: string;
   cpf: string;
-  address: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  referencePoint?: string;
   phone: string;
 }
 
@@ -27,3 +30,4 @@ export async function revalidateCustomersPage(): Promise<{ success: boolean }> {
     return { success: false };
   }
 }
+
