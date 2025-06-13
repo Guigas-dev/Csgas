@@ -1,4 +1,3 @@
-
 "use client";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2 } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -19,15 +18,15 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, getISOWeek, getYear } from "date-fns"; // Removed AI related date-fns imports: parseISO, addDays, isAfter, startOfToday
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, getISOWeek, getYear, parseISO, addDays, isAfter, startOfToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp, where } from "firebase/firestore"; // Removed firestoreLimit (was for AI)
+import { collection, getDocs, query, orderBy, Timestamp, where, limit } from "firebase/firestore";
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
 import type { Sale } from "./sales/actions";
-// import type { Customer } from "./customers/actions"; // Not strictly needed here after AI card removal
+import type { Customer } from "./customers/actions";
 
 
 const salesBarChartConfig = {
@@ -42,6 +41,8 @@ const salesBarChartConfig = {
 };
 
 const maxStock = 100;
+const LOW_STOCK_THRESHOLD = 20; // Limite para alerta de estoque baixo
+
 const stockPieChartConfig = {
   value: { label: "Unidades" },
   "Em Estoque": { label: "Em Estoque", color: "hsl(var(--chart-1))" },
@@ -95,7 +96,6 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
   );
 };
 
-// Removed isValidPredictionDateString as it was for AI card
 
 export default function DashboardPage() {
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null);
@@ -125,10 +125,9 @@ export default function DashboardPage() {
   const [dynamicSalesChartData, setDynamicSalesChartData] = useState<any[]>([]);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null);
 
-  // Removed upcomingPurchases and isLoadingUpcomingPurchases states (AI related)
-
 
   useEffect(() => {
+    // Client-side only effect for setting initial time to avoid hydration mismatch
     setLastUpdatedTime(new Date());
   }, []);
 
@@ -226,7 +225,7 @@ export default function DashboardPage() {
         });
         
         const chartDataFormatted = Object.values(weeklySalesData).sort((a,b) => a.weekLabel.localeCompare(b.weekLabel));
-        setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ date: format(now, "MMM dd"), vendas: 0, mesAnterior: 0 }]);
+        setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ date: format(now, "MMM dd", {locale: ptBR}), vendas: 0, mesAnterior: 0 }]);
 
 
         setTotalSalesMonth(currentMonthSalesValue);
@@ -256,13 +255,11 @@ export default function DashboardPage() {
       }
     };
 
-    // Removed fetchUpcomingPurchases function call (AI related)
 
     fetchStockMovements();
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
-    // fetchUpcomingPurchases(); // Removed AI related call
   }, [toast]);
 
   const handleEditPrices = () => {
@@ -294,6 +291,7 @@ export default function DashboardPage() {
   ];
   
   const totalDueFromDefaults = defaultingCustomers.reduce((sum, item) => sum + item.value, 0);
+  const isStockLow = currentStockLevel !== null && currentStockLevel < LOW_STOCK_THRESHOLD;
 
   return (
     <div className="container mx-auto">
@@ -334,7 +332,15 @@ export default function DashboardPage() {
           value={currentStockLevel}
           icon={<PackageSearch className="h-5 w-5 text-foreground" />}
           isLoading={isLoadingStock}
-          valueColor="text-foreground"
+          valueColor={isLoadingStock ? "text-foreground" : (isStockLow ? "text-yellow-500" : "text-foreground")}
+          subText={
+            isLoadingStock 
+              ? undefined // KpiCard handles loading subtext display internally
+              : currentStockLevel !== null 
+                ? `${currentStockLevel}/${maxStock} unidades ${isStockLow ? " - Atenção!" : ""}` 
+                : `0/${maxStock} unidades`
+          }
+          subTextColor={isLoadingStock ? "text-muted-foreground" : (isStockLow ? "text-yellow-600" : "text-muted-foreground")}
         />
       </div>
 
@@ -563,10 +569,12 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-3xl font-bold text-foreground">{currentStockForChart}
-                      <span className="text-xl text-foreground"> / {maxStock}</span>
+                    <p className={`text-3xl font-bold ${isStockLow ? 'text-yellow-500' : 'text-foreground'}`}>{currentStockForChart}
+                      <span className={`text-xl ${isStockLow ? 'text-yellow-500' : 'text-foreground'}`}> / {maxStock}</span>
                     </p>
-                    <p className="text-sm text-muted-foreground mb-3">Botijões em estoque</p>
+                    <p className={`text-sm mb-3 ${isStockLow ? 'text-yellow-600' : 'text-muted-foreground'}`}>
+                      Botijões em estoque {isStockLow && "(Atenção: Baixo!)"}
+                    </p>
                     <Progress value={(currentStockForChart / maxStock) * 100} className="w-full h-2.5" />
                     <p className="text-xs text-foreground mt-4">
                       {((currentStockForChart / maxStock) * 100).toFixed(0)}% da capacidade total utilizada.
@@ -604,8 +612,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          {/* Card "Próximas Compras (IA)" removido */}
-
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
