@@ -72,7 +72,8 @@ import type { Customer } from "../customers/actions";
 import type { StockMovementEntry } from "../stock/actions";
 import { useAuth } from "@/contexts/auth-context";
 import type { DefaultEntry } from "../defaults/actions";
-import { predictNextPurchase, type PredictNextPurchaseInput } from "@/ai/flows/predict-next-purchase-flow";
+// import { predictNextPurchase, type PredictNextPurchaseInput } from "@/ai/flows/predict-next-purchase-flow"; // Removed AI import
+// import { revalidatePath } from 'next/cache'; // Not needed here after AI removal
 
 
 const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
@@ -252,16 +253,16 @@ export default function SalesPage() {
       } else {
          if (saleMode === 'quick') {
             setFormData({
-                ...initialFormData, // Includes customerName: "Consumidor Final"
+                ...initialFormData, 
                 customerId: null,
                 date: new Date(),
                 paymentDueDate: null,
             });
-        } else { // saleMode === 'customer'
+        } else { 
             setFormData({
                 ...initialFormData,
                 customerId: null, 
-                customerName: "", // No default name, user must select
+                customerName: "", 
                 date: new Date(),
                 paymentDueDate: null,
             });
@@ -355,10 +356,10 @@ export default function SalesPage() {
       payloadCustomerName = selectedCust ? selectedCust.name : "Cliente Desconhecido";
     } else if (saleMode === 'quick') {
       payloadCustomerName = formData.customerName?.trim() || "Consumidor Final";
-    } else if (editingSale && editingSale.customerId) { // Editing a sale that had a customer
+    } else if (editingSale && editingSale.customerId) { 
         const selectedCust = customers.find(c => c.id === editingSale.customerId);
         payloadCustomerName = selectedCust ? selectedCust.name : "Cliente Desconhecido";
-    } else { // Editing a quick sale or new customer sale without selection
+    } else { 
         payloadCustomerName = formData.customerName?.trim() || "Consumidor Final";
     }
     
@@ -444,57 +445,10 @@ export default function SalesPage() {
                      " e quaisquer pendências/estoque associados foram atualizados." 
       });
       
-      // AI Prediction Logic
-      if (payloadCustomerId) { // Only predict if there's an associated customer
-        try {
-          const salesQueryInternal = query(
-            collection(db, "sales"),
-            where("customerId", "==", payloadCustomerId),
-            orderBy("date", "asc")
-          );
-          const salesSnapshotInternal = await getDocs(salesQueryInternal);
-          const customerSalesHistoryForAI = salesSnapshotInternal.docs.map(sDoc => {
-              const data = sDoc.data();
-              return {
-                  date: (data.date as Timestamp).toDate(),
-                  quantity: data.gasCanistersQuantity,
-              };
-          });
-
-          if (customerSalesHistoryForAI.length > 0) {
-            const aiInput: PredictNextPurchaseInput = {
-              customerId: payloadCustomerId,
-              salesHistory: customerSalesHistoryForAI.map(sale => ({
-                date: format(sale.date, "yyyy-MM-dd"),
-                quantity: sale.quantity,
-              })),
-            };
-            const predictionResult = await predictNextPurchase(aiInput);
-
-            if (predictionResult && predictionResult.predictedNextPurchaseDate) {
-              const customerRef = doc(db, "customers", payloadCustomerId);
-              await updateDoc(customerRef, {
-                data_prevista_proxima_compra: predictionResult.predictedNextPurchaseDate,
-                prediction_reasoning: predictionResult.reasoning || "",
-                // updatedAt will be handled by customer's own CRUD if separate
-              });
-              console.log("Previsão da IA atualizada para o cliente:", payloadCustomerId);
-              revalidatePath('/customers'); // Revalidate to show updated prediction
-            }
-          }
-        } catch (aiError) {
-          console.error("Erro durante a previsão da IA ou atualização do cliente:", aiError);
-          toast({
-            variant: "destructive",
-            title: "Erro na Previsão IA",
-            description: "Não foi possível gerar a previsão de próxima compra. A venda foi salva normalmente.",
-            duration: 5000,
-          });
-        }
-      }
+      // AI Prediction Logic Removed
 
       setIsFormOpen(false);
-      await revalidateSalesRelatedPages(); // This already revalidates /sales, /stock, /, /defaults
+      await revalidateSalesRelatedPages(); 
       fetchSales();
     } catch (e: unknown) {
       console.error('Error saving sale and/or related operations:', e);
@@ -708,7 +662,7 @@ export default function SalesPage() {
                     disabled={isSubmitting}
                   />
                 </div>
-              ) : saleMode === 'customer' || (editingSale && editingSale.customerId) ? ( // Explicitly check for customer mode or editing a customer sale
+              ) : saleMode === 'customer' || (editingSale && editingSale.customerId) ? ( 
                 <div className="space-y-1">
                   <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
                   <div className="flex items-center gap-2">
@@ -766,7 +720,7 @@ export default function SalesPage() {
                     </Button>
                   </div>
                 </div>
-              ) : null /* Should not happen if logic is correct */}
+              ) : null }
 
 
               <div className="space-y-1">
@@ -1025,4 +979,3 @@ export default function SalesPage() {
     </div>
   );
 }
-

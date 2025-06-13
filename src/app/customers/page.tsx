@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Loader2, Info } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -43,15 +43,8 @@ import {
 import type { Customer, CustomerFormData } from "./actions";
 import { revalidateCustomersPage } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
-import { format } from "date-fns";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const isValidDateString = (dateString?: string | null): boolean => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  // Check if it's a valid date and specifically if the year is reasonable (not 1970 from bad string)
-  return !isNaN(date.getTime()) && date.getFullYear() > 1970;
-};
+// import { format } from "date-fns"; // Not strictly needed if no dates displayed here anymore, but kept for safety
+// import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Removed for AI prediction
 
 
 export default function CustomersPage() {
@@ -87,8 +80,8 @@ export default function CustomersPage() {
           // Ensure Timestamps are converted if they exist
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-          data_prevista_proxima_compra: data.data_prevista_proxima_compra,
-          prediction_reasoning: data.prediction_reasoning,
+          // data_prevista_proxima_compra: data.data_prevista_proxima_compra, // Removed AI field
+          // prediction_reasoning: data.prediction_reasoning, // Removed AI field
         } as Customer;
       });
       setCustomers(customersData);
@@ -106,7 +99,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [toast]); // Removed fetchCustomers from dependency array to avoid potential loops with toast
+  }, [toast]); 
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -241,7 +234,7 @@ export default function CustomersPage() {
               <p className="ml-2 text-muted-foreground">Carregando clientes...</p>
             </div>
           ) : (
-            <TooltipProvider>
+            // <TooltipProvider> // Removed TooltipProvider for AI
             <Table>
               <TableHeader>
                 <TableRow>
@@ -249,7 +242,7 @@ export default function CustomersPage() {
                   <TableHead>CPF</TableHead>
                   <TableHead>Endereço</TableHead>
                   <TableHead>Telefone</TableHead>
-                  <TableHead>Próx. Compra (IA)</TableHead>
+                  {/* <TableHead>Próx. Compra (IA)</TableHead> // Removed AI column */}
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -262,7 +255,7 @@ export default function CustomersPage() {
                       {`${customer.street || ''}${customer.number ? `, ${customer.number}` : ''}${customer.neighborhood ? ` - ${customer.neighborhood}` : ''}` || 'N/A'}
                     </TableCell>
                     <TableCell>{customer.phone}</TableCell>
-                    <TableCell>
+                    {/* <TableCell> // Removed AI cell content
                       {customer.data_prevista_proxima_compra ? (
                         isValidDateString(customer.data_prevista_proxima_compra) ? (
                           <Tooltip>
@@ -296,9 +289,9 @@ export default function CustomersPage() {
                           </Tooltip>
                         )
                       ) : (
-                        "N/D" // N/D = Não disponível / Não Definido
+                        "N/D" 
                       )}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-accent" disabled={isSubmitting}>
                         <Edit className="h-4 w-4" />
@@ -311,7 +304,7 @@ export default function CustomersPage() {
                 ))}
               </TableBody>
             </Table>
-            </TooltipProvider>
+            // </TooltipProvider> // Removed TooltipProvider for AI
           )}
           {!isLoading && customers.length === 0 && (
             <p className="text-center text-muted-foreground py-4">Nenhum cliente cadastrado.</p>
@@ -378,4 +371,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-

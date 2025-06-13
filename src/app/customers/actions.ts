@@ -16,8 +16,8 @@ export interface CustomerFormData {
 
 export interface Customer extends CustomerFormData {
   id: string;
-  data_prevista_proxima_compra?: string; // Formato YYYY-MM-DD ou texto como "Incerta"
-  prediction_reasoning?: string;
+  // data_prevista_proxima_compra?: string; // Removed AI field
+  // prediction_reasoning?: string; // Removed AI field
   // createdAt and updatedAt can be handled client-side or through Firestore server timestamps
 }
 
@@ -32,4 +32,3 @@ export async function revalidateCustomersPage(): Promise<{ success: boolean }> {
     return { success: false };
   }
 }
-

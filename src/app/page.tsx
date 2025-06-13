@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2, CalendarClock } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -19,15 +19,15 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO, getISOWeek, getYear, addDays, isAfter, startOfToday } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, getISOWeek, getYear } from "date-fns"; // Removed AI related date-fns imports: parseISO, addDays, isAfter, startOfToday
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp, limit as firestoreLimit, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, Timestamp, where } from "firebase/firestore"; // Removed firestoreLimit (was for AI)
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
 import type { Sale } from "./sales/actions";
-import type { Customer } from "./customers/actions";
+// import type { Customer } from "./customers/actions"; // Not strictly needed here after AI card removal
 
 
 const salesBarChartConfig = {
@@ -95,16 +95,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
   );
 };
 
-// Helper function to check if a string is a valid YYYY-MM-DD date
-const isValidPredictionDateString = (dateString?: string | null): boolean => {
-  if (!dateString) return false;
-  // Basic check for YYYY-MM-DD format and if it parses to a valid date
-  const regex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!regex.test(dateString)) return false;
-  const date = parseISO(dateString); // parseISO expects YYYY-MM-DD
-  return !isNaN(date.getTime()) && date.getFullYear() > 1970; // Basic validity check
-};
-
+// Removed isValidPredictionDateString as it was for AI card
 
 export default function DashboardPage() {
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null);
@@ -134,8 +125,7 @@ export default function DashboardPage() {
   const [dynamicSalesChartData, setDynamicSalesChartData] = useState<any[]>([]);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null);
 
-  const [upcomingPurchases, setUpcomingPurchases] = useState<Customer[]>([]);
-  const [isLoadingUpcomingPurchases, setIsLoadingUpcomingPurchases] = useState(true);
+  // Removed upcomingPurchases and isLoadingUpcomingPurchases states (AI related)
 
 
   useEffect(() => {
@@ -266,56 +256,13 @@ export default function DashboardPage() {
       }
     };
 
-    const fetchUpcomingPurchases = async () => {
-      setIsLoadingUpcomingPurchases(true);
-      try {
-        const today = startOfToday();
-        const sevenDaysFromNow = addDays(today, 7);
-
-        const q = query(
-          collection(db, "customers"),
-          where("data_prevista_proxima_compra", "!=", null) 
-        );
-        const querySnapshot = await getDocs(q);
-        
-        const potentialPurchases = querySnapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        } as Customer));
-
-        const filteredPurchases = potentialPurchases
-          .filter(customer => {
-            if (customer.data_prevista_proxima_compra && isValidPredictionDateString(customer.data_prevista_proxima_compra)) {
-              const predictedDate = parseISO(customer.data_prevista_proxima_compra);
-              return isAfter(predictedDate, today) && isWithinInterval(predictedDate, { start: today, end: sevenDaysFromNow });
-            }
-            return false;
-          })
-          .sort((a, b) => {
-             // Ensure data_prevista_proxima_compra is not undefined before parsing
-            if (!a.data_prevista_proxima_compra || !b.data_prevista_proxima_compra) return 0;
-            return parseISO(a.data_prevista_proxima_compra).getTime() - parseISO(b.data_prevista_proxima_compra).getTime();
-          })
-          .slice(0, 5); // Limit to 5 upcoming purchases
-
-        setUpcomingPurchases(filteredPurchases);
-      } catch (error) {
-        console.error("Error fetching upcoming purchases: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao buscar previsões",
-          description: "Não foi possível carregar as próximas compras previstas.",
-        });
-      } finally {
-        setIsLoadingUpcomingPurchases(false);
-      }
-    };
+    // Removed fetchUpcomingPurchases function call (AI related)
 
     fetchStockMovements();
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
-    fetchUpcomingPurchases();
+    // fetchUpcomingPurchases(); // Removed AI related call
   }, [toast]);
 
   const handleEditPrices = () => {
@@ -657,55 +604,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          <Card className="shadow-sm bg-card">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xl flex items-center text-foreground">
-                  <CalendarClock className="mr-2 h-5 w-5 text-foreground" />
-                  Próximas Compras (IA)
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
-                  <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
-                </Button>
-              </div>
-              <CardDescription>Clientes com previsão de compra nos próximos 7 dias.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingUpcomingPurchases ? (
-                <div className="flex justify-center items-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="ml-2 text-sm text-muted-foreground">Carregando previsões...</p>
-                </div>
-              ) : (
-                <>
-                  {upcomingPurchases.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-foreground">Cliente</TableHead>
-                          <TableHead className="text-foreground text-right">Data Prevista</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {upcomingPurchases.map((customer) => (
-                          <TableRow key={customer.id}>
-                            <TableCell className="font-medium text-card-foreground">{customer.name}</TableCell>
-                            <TableCell className="text-card-foreground text-right">
-                              {customer.data_prevista_proxima_compra && isValidPredictionDateString(customer.data_prevista_proxima_compra)
-                                ? format(parseISO(customer.data_prevista_proxima_compra), "dd/MM/yy", { locale: ptBR })
-                                : customer.data_prevista_proxima_compra}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <p className="text-center text-muted-foreground py-4">Nenhuma compra prevista para os próximos 7 dias.</p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+          {/* Card "Próximas Compras (IA)" removido */}
 
           <Card className="shadow-sm bg-card">
             <CardHeader>
@@ -803,6 +702,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
