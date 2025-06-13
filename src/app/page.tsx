@@ -497,7 +497,7 @@ export default function DashboardPage() {
                   <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23% {/* Placeholder */}
                 </div>
                 {lastUpdatedTime ? (
-                  <p className="text-xs text-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                  <p className="text-xs text-muted-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">Carregando hora...</p>
                 )}
