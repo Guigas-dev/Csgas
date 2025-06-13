@@ -28,7 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
-const VendaFacilLogo = () => (
+const CSGASLogo = () => (
   <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary">
     <defs>
       <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -93,8 +93,8 @@ export function AppSidebarNav() {
     <>
       <SidebarHeader className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <VendaFacilLogo />
-          <h1 className="text-xl font-semibold text-foreground font-headline">VendaFacil</h1>
+          <CSGASLogo />
+          <h1 className="text-xl font-semibold text-foreground font-headline">CS GAS</h1>
         </div>
         <SidebarTrigger className="md:hidden" />
       </SidebarHeader>

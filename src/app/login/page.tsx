@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
-const VendaFacilLogoFull = () => (
+const CSGASLogoFull = () => (
   <div className="flex items-center justify-center mb-6">
     <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary mr-3">
       <defs>
@@ -25,7 +25,7 @@ const VendaFacilLogoFull = () => (
       <path fill="url(#gradLogin)" d="M50 5 L95 27.5 L95 72.5 L50 95 L5 72.5 L5 27.5 Z M50 15 L85 32.5 V 67.5 L50 85 L15 67.5 V 32.5 Z"></path>
       <text x="50" y="62" fontSize="40" fill="hsl(var(--primary-foreground))" textAnchor="middle" fontWeight="bold" className="font-headline">V</text>
     </svg>
-    <h1 className="text-3xl font-bold text-foreground font-headline">VendaFacil</h1>
+    <h1 className="text-3xl font-bold text-foreground font-headline">CS GAS</h1>
   </div>
 );
 
@@ -94,7 +94,7 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md shadow-xl bg-card border-border/30">
       <CardHeader className="text-center">
-        <VendaFacilLogoFull />
+        <CSGASLogoFull />
         <CardTitle className="text-2xl text-foreground">Acesse sua conta</CardTitle>
         <CardDescription>Bem-vindo de volta! Faça login para continuar.</CardDescription>
       </CardHeader>
