@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight, AlertTriangle, DatabaseZap } from "lucide-react";
 import {
   Table,
@@ -44,13 +44,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, writeBatch, doc } from "firebase/firestore";
-import { revalidatePath } from 'next/cache';
-import { revalidateCustomersPage } from "../customers/actions";
-import { revalidateSalesRelatedPages } from "../sales/actions";
-import { revalidateDefaultsRelatedPages } from "../defaults/actions";
-import { revalidateStockRelatedPages } from "../stock/actions";
+import { clearFirestoreCollection, type ClearableCollectionName } from "./actions";
+import { cn } from "@/lib/utils";
 
 
 interface SystemUser {
@@ -78,17 +73,15 @@ const initialUsersData: SystemUser[] = [
 const accessLevelsOptions: SystemUser["accessLevel"][] = ["Admin", "Usuário"];
 const ITEMS_PER_PAGE = 10;
 
-type CollectionName = "customers" | "sales" | "defaults" | "stockMovements";
-
 export default function UsersPage() {
-  const [allUsers, setAllUsers] = useState<SystemUser[]>(initialUsersData); 
+  const [allUsers, setAllUsers] = useState<SystemUser[]>(initialUsersData);
   const [paginatedUsers, setPaginatedUsers] = useState<SystemUser[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const initialFormState = {
     name: "",
@@ -102,7 +95,7 @@ export default function UsersPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
-  const [collectionToClear, setCollectionToClear] = useState<CollectionName | null>(null);
+  const [collectionToClear, setCollectionToClear] = useState<ClearableCollectionName | null>(null);
   const [isClearingData, setIsClearingData] = useState(false);
 
 
@@ -135,7 +128,7 @@ export default function UsersPage() {
     setFormData({
       name: user.name,
       email: user.email,
-      password: "", 
+      password: "",
       confirmPassword: "",
       accessLevel: user.accessLevel,
     });
@@ -145,7 +138,7 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = (id: string) => {
-    if (id === "u1") { 
+    if (id === "u1") {
       toast({
         variant: "destructive",
         title: "Ação não permitida",
@@ -154,7 +147,7 @@ export default function UsersPage() {
       return;
     }
     setIsSubmitting(true);
-    setTimeout(() => { 
+    setTimeout(() => {
         setAllUsers(prev => {
           const updatedUsers = prev.filter(u => u.id !== id);
           const newTotalPages = Math.ceil(updatedUsers.length / ITEMS_PER_PAGE);
@@ -193,7 +186,7 @@ export default function UsersPage() {
       return;
     }
 
-    setTimeout(() => { 
+    setTimeout(() => {
         if (editingUser) {
           if (formData.email.toLowerCase() !== editingUser.email.toLowerCase()) {
             const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser.id);
@@ -227,12 +220,12 @@ export default function UsersPage() {
             return;
           }
           const newUser: SystemUser = {
-            id: String(Date.now()), 
+            id: String(Date.now()),
             name: formData.name,
             email: formData.email,
             accessLevel: formData.accessLevel,
           };
-          setAllUsers(prev => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name))); 
+          setAllUsers(prev => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name)));
           toast({ title: "Usuário Adicionado!", description: "Novo usuário cadastrado com sucesso." });
         }
         setIsFormOpen(false);
@@ -240,7 +233,7 @@ export default function UsersPage() {
     }, 1000);
   };
 
-  const openClearConfirmationDialog = (collectionName: CollectionName) => {
+  const openClearConfirmationDialog = (collectionName: ClearableCollectionName) => {
     setCollectionToClear(collectionName);
     setIsAlertDialogOpen(true);
   };
@@ -249,57 +242,20 @@ export default function UsersPage() {
     if (!collectionToClear) return;
 
     setIsClearingData(true);
-    try {
-      const q = query(collection(db, collectionToClear));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        toast({ title: "Nada a Limpar", description: `A coleção "${collectionToClear}" já está vazia.` });
-        setIsAlertDialogOpen(false);
-        setIsClearingData(false);
-        setCollectionToClear(null);
-        return;
-      }
+    const result = await clearFirestoreCollection(collectionToClear);
 
-      const batch = writeBatch(db);
-      querySnapshot.docs.forEach(docSnapshot => {
-        batch.delete(docSnapshot.ref);
-      });
-      await batch.commit();
-
-      toast({ title: "Dados Limpos!", description: `Todos os registros da coleção "${collectionToClear}" foram removidos.` });
-
-      // Revalidate relevant pages
-      switch (collectionToClear) {
-        case "customers":
-          await revalidateCustomersPage();
-          await revalidatePath('/');
-          break;
-        case "sales":
-          await revalidateSalesRelatedPages();
-           await revalidatePath('/');
-          break;
-        case "defaults":
-          await revalidateDefaultsRelatedPages();
-           await revalidatePath('/');
-          break;
-        case "stockMovements":
-          await revalidateStockRelatedPages();
-           await revalidatePath('/');
-          break;
-      }
-
-    } catch (error) {
-      console.error(`Error clearing collection ${collectionToClear}:`, error);
-      toast({ variant: "destructive", title: "Erro ao Limpar Dados", description: `Não foi possível limpar a coleção "${collectionToClear}".` });
-    } finally {
-      setIsAlertDialogOpen(false);
-      setIsClearingData(false);
-      setCollectionToClear(null);
+    if (result.success) {
+      toast({ title: "Dados Limpos!", description: result.message });
+    } else {
+      toast({ variant: "destructive", title: "Erro ao Limpar Dados", description: result.message });
     }
+
+    setIsAlertDialogOpen(false);
+    setIsClearingData(false);
+    setCollectionToClear(null);
   };
-  
-  const getCollectionDisplayName = (collectionName: CollectionName | null): string => {
+
+  const getCollectionDisplayName = (collectionName: ClearableCollectionName | null): string => {
     if (!collectionName) return "";
     switch (collectionName) {
         case "customers": return "Clientes";
@@ -531,7 +487,7 @@ export default function UsersPage() {
             <AlertDialogAction
               onClick={handleConfirmClearData}
               disabled={isClearingData}
-              className={buttonVariants({ variant: "destructive" })}
+              className={cn(buttonVariants({ variant: "destructive" }))}
             >
               {isClearingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, Excluir Tudo"}
             </AlertDialogAction>
