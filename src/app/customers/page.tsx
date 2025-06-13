@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase/config"; // Firestore instance
+import { db } from "@/lib/firebase/config"; 
 import { 
   collection, 
   getDocs, 
@@ -43,6 +43,16 @@ import {
 import type { Customer, CustomerFormData } from "./actions";
 import { revalidateCustomersPage } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
+import { format } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const isValidDateString = (dateString?: string | null): boolean => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  // Check if it's a valid date and specifically if the year is reasonable (not 1970 from bad string)
+  return !isNaN(date.getTime()) && date.getFullYear() > 1970;
+};
+
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -67,15 +77,18 @@ export default function CustomersPage() {
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "customers"), orderBy("createdAt", "desc"));
+      const q = query(collection(db, "customers"), orderBy("name", "asc")); // Order by name
       const querySnapshot = await getDocs(q);
-      const customersData = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+      const customersData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
         return { 
-          id: doc.id, 
+          id: docSnap.id, 
           ...data,
+          // Ensure Timestamps are converted if they exist
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
+          data_prevista_proxima_compra: data.data_prevista_proxima_compra,
+          prediction_reasoning: data.prediction_reasoning,
         } as Customer;
       });
       setCustomers(customersData);
@@ -93,7 +106,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [toast]);
+  }, [toast]); // Removed fetchCustomers from dependency array to avoid potential loops with toast
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -150,14 +163,12 @@ export default function CustomersPage() {
     
     try {
       if (editingCustomer) {
-        // Se estiver editando, e o CPF foi alterado, verificar se o NOVO CPF já existe em OUTRO cliente.
         if (formData.cpf !== editingCustomer.cpf) {
           const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
-            // Verifica se o CPF encontrado pertence a um cliente diferente do que está sendo editado
-            const existingCustomer = querySnapshot.docs.find(d => d.id !== editingCustomer.id);
-            if (existingCustomer) {
+            const existingCustomerDoc = querySnapshot.docs.find(d => d.id !== editingCustomer.id);
+            if (existingCustomerDoc) {
               toast({
                 variant: "destructive",
                 title: "Erro ao Atualizar Cliente",
@@ -175,7 +186,6 @@ export default function CustomersPage() {
         });
         toast({ title: "Cliente atualizado!", description: "Os dados do cliente foram atualizados." });
       } else {
-        // Se estiver adicionando um novo cliente, verificar se o CPF já existe.
         const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -189,7 +199,8 @@ export default function CustomersPage() {
         }
         await addDoc(collection(db, 'customers'), {
           ...formData,
-          createdAt: serverTimestamp(), 
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(), 
         });
         toast({ title: "Cliente adicionado!", description: "Novo cliente cadastrado com sucesso." });
       }
@@ -230,6 +241,7 @@ export default function CustomersPage() {
               <p className="ml-2 text-muted-foreground">Carregando clientes...</p>
             </div>
           ) : (
+            <TooltipProvider>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -237,6 +249,7 @@ export default function CustomersPage() {
                   <TableHead>CPF</TableHead>
                   <TableHead>Endereço</TableHead>
                   <TableHead>Telefone</TableHead>
+                  <TableHead>Próx. Compra (IA)</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -249,6 +262,43 @@ export default function CustomersPage() {
                       {`${customer.street || ''}${customer.number ? `, ${customer.number}` : ''}${customer.neighborhood ? ` - ${customer.neighborhood}` : ''}` || 'N/A'}
                     </TableCell>
                     <TableCell>{customer.phone}</TableCell>
+                    <TableCell>
+                      {customer.data_prevista_proxima_compra ? (
+                        isValidDateString(customer.data_prevista_proxima_compra) ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default flex items-center">
+                                {format(new Date(customer.data_prevista_proxima_compra as string), "dd/MM/yy")}
+                                {customer.prediction_reasoning && <Info className="h-3 w-3 ml-1 text-muted-foreground" />}
+                              </span>
+                            </TooltipTrigger>
+                            {customer.prediction_reasoning && (
+                              <TooltipContent className="bg-popover text-popover-foreground max-w-xs p-2">
+                                <p className="text-xs font-medium">Raciocínio da IA:</p>
+                                <p className="text-xs">{customer.prediction_reasoning}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        ) : (
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                               <span className="cursor-default flex items-center">
+                                {customer.data_prevista_proxima_compra}
+                                {customer.prediction_reasoning && <Info className="h-3 w-3 ml-1 text-muted-foreground" />}
+                               </span>
+                            </TooltipTrigger>
+                            {customer.prediction_reasoning && (
+                              <TooltipContent className="bg-popover text-popover-foreground max-w-xs p-2">
+                                <p className="text-xs font-medium">Raciocínio da IA:</p>
+                                <p className="text-xs">{customer.prediction_reasoning}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        )
+                      ) : (
+                        "N/D" // N/D = Não disponível / Não Definido
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-accent" disabled={isSubmitting}>
                         <Edit className="h-4 w-4" />
@@ -261,6 +311,7 @@ export default function CustomersPage() {
                 ))}
               </TableBody>
             </Table>
+            </TooltipProvider>
           )}
           {!isLoading && customers.length === 0 && (
             <p className="text-center text-muted-foreground py-4">Nenhum cliente cadastrado.</p>

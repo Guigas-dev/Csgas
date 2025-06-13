@@ -16,6 +16,8 @@ export interface CustomerFormData {
 
 export interface Customer extends CustomerFormData {
   id: string;
+  data_prevista_proxima_compra?: string; // Formato YYYY-MM-DD ou texto como "Incerta"
+  prediction_reasoning?: string;
   // createdAt and updatedAt can be handled client-side or through Firestore server timestamps
 }
 
