@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight, AlertTriangle, DatabaseZap } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,10 +22,20 @@ import {
   SheetTitle,
   SheetClose,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -34,6 +44,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/firebase/config";
+import { collection, getDocs, query, writeBatch, doc } from "firebase/firestore";
+import { revalidatePath } from 'next/cache';
+import { revalidateCustomersPage } from "../customers/actions";
+import { revalidateSalesRelatedPages } from "../sales/actions";
+import { revalidateDefaultsRelatedPages } from "../defaults/actions";
+import { revalidateStockRelatedPages } from "../stock/actions";
+
 
 interface SystemUser {
   id: string;
@@ -60,8 +78,10 @@ const initialUsersData: SystemUser[] = [
 const accessLevelsOptions: SystemUser["accessLevel"][] = ["Admin", "Usuário"];
 const ITEMS_PER_PAGE = 10;
 
+type CollectionName = "customers" | "sales" | "defaults" | "stockMovements";
+
 export default function UsersPage() {
-  const [allUsers, setAllUsers] = useState<SystemUser[]>(initialUsersData); // Stores all users (mocked)
+  const [allUsers, setAllUsers] = useState<SystemUser[]>(initialUsersData); 
   const [paginatedUsers, setPaginatedUsers] = useState<SystemUser[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -80,6 +100,11 @@ export default function UsersPage() {
   const [formData, setFormData] = useState(initialFormState);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
+  const [collectionToClear, setCollectionToClear] = useState<CollectionName | null>(null);
+  const [isClearingData, setIsClearingData] = useState(false);
+
 
   useEffect(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -129,11 +154,9 @@ export default function UsersPage() {
       return;
     }
     setIsSubmitting(true);
-    setTimeout(() => { // Simulate API call
+    setTimeout(() => { 
         setAllUsers(prev => {
           const updatedUsers = prev.filter(u => u.id !== id);
-          // After updating allUsers, pagination effect will re-calculate paginatedUsers
-          // If deleting the last item on a page makes the page empty, adjust currentPage
           const newTotalPages = Math.ceil(updatedUsers.length / ITEMS_PER_PAGE);
           if (currentPage > newTotalPages && newTotalPages > 0) {
             setCurrentPage(newTotalPages);
@@ -170,7 +193,7 @@ export default function UsersPage() {
       return;
     }
 
-    setTimeout(() => { // Simulate API call
+    setTimeout(() => { 
         if (editingUser) {
           if (formData.email.toLowerCase() !== editingUser.email.toLowerCase()) {
             const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser.id);
@@ -204,18 +227,89 @@ export default function UsersPage() {
             return;
           }
           const newUser: SystemUser = {
-            id: String(Date.now()), // Simple ID generation for mock data
+            id: String(Date.now()), 
             name: formData.name,
             email: formData.email,
             accessLevel: formData.accessLevel,
           };
-          setAllUsers(prev => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name))); // Keep sorted for consistency
+          setAllUsers(prev => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name))); 
           toast({ title: "Usuário Adicionado!", description: "Novo usuário cadastrado com sucesso." });
         }
         setIsFormOpen(false);
         setIsSubmitting(false);
     }, 1000);
   };
+
+  const openClearConfirmationDialog = (collectionName: CollectionName) => {
+    setCollectionToClear(collectionName);
+    setIsAlertDialogOpen(true);
+  };
+
+  const handleConfirmClearData = async () => {
+    if (!collectionToClear) return;
+
+    setIsClearingData(true);
+    try {
+      const q = query(collection(db, collectionToClear));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        toast({ title: "Nada a Limpar", description: `A coleção "${collectionToClear}" já está vazia.` });
+        setIsAlertDialogOpen(false);
+        setIsClearingData(false);
+        setCollectionToClear(null);
+        return;
+      }
+
+      const batch = writeBatch(db);
+      querySnapshot.docs.forEach(docSnapshot => {
+        batch.delete(docSnapshot.ref);
+      });
+      await batch.commit();
+
+      toast({ title: "Dados Limpos!", description: `Todos os registros da coleção "${collectionToClear}" foram removidos.` });
+
+      // Revalidate relevant pages
+      switch (collectionToClear) {
+        case "customers":
+          await revalidateCustomersPage();
+          await revalidatePath('/');
+          break;
+        case "sales":
+          await revalidateSalesRelatedPages();
+           await revalidatePath('/');
+          break;
+        case "defaults":
+          await revalidateDefaultsRelatedPages();
+           await revalidatePath('/');
+          break;
+        case "stockMovements":
+          await revalidateStockRelatedPages();
+           await revalidatePath('/');
+          break;
+      }
+
+    } catch (error) {
+      console.error(`Error clearing collection ${collectionToClear}:`, error);
+      toast({ variant: "destructive", title: "Erro ao Limpar Dados", description: `Não foi possível limpar a coleção "${collectionToClear}".` });
+    } finally {
+      setIsAlertDialogOpen(false);
+      setIsClearingData(false);
+      setCollectionToClear(null);
+    }
+  };
+  
+  const getCollectionDisplayName = (collectionName: CollectionName | null): string => {
+    if (!collectionName) return "";
+    switch (collectionName) {
+        case "customers": return "Clientes";
+        case "sales": return "Vendas";
+        case "defaults": return "Inadimplências";
+        case "stockMovements": return "Movimentações de Estoque";
+        default: return collectionName;
+    }
+  };
+
 
   return (
     <div>
@@ -229,7 +323,7 @@ export default function UsersPage() {
         }
       />
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Lista de Usuários</CardTitle>
         </CardHeader>
@@ -372,6 +466,79 @@ export default function UsersPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <DatabaseZap className="mr-2 h-5 w-5 text-destructive" />
+            Ferramentas de Limpeza de Dados
+          </CardTitle>
+          <CardDescription>
+            Use estas ferramentas com <strong className="text-destructive">extremo cuidado</strong>. A exclusão de dados é <strong className="text-destructive">permanente</strong>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Abaixo você pode limpar todos os registros de coleções específicas no banco de dados. Esta ação não pode ser desfeita.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Button
+              variant="destructive"
+              onClick={() => openClearConfirmationDialog("customers")}
+              disabled={isClearingData}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Limpar Clientes
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => openClearConfirmationDialog("sales")}
+              disabled={isClearingData}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Limpar Vendas
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => openClearConfirmationDialog("defaults")}
+              disabled={isClearingData}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Limpar Inadimplências
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => openClearConfirmationDialog("stockMovements")}
+              disabled={isClearingData}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Limpar Mov. Estoque
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={isAlertDialogOpen} onOpenChange={setIsAlertDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
+              Confirmar Exclusão de Dados
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem certeza que deseja excluir <strong className="text-destructive">todos os registros</strong> da coleção de <strong className="text-destructive">{getCollectionDisplayName(collectionToClear)}</strong>?
+              Esta ação é <strong className="text-destructive">permanente</strong> e não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearingData}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmClearData}
+              disabled={isClearingData}
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              {isClearingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, Excluir Tudo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
