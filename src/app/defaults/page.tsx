@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Edit, PlusCircle, Filter, Loader2, Trash2 } from "lucide-react";
@@ -59,8 +59,6 @@ import { useAuth } from "@/contexts/auth-context";
 
 
 const paymentStatuses = ["Pending", "Paid"];
-const CONSUMIDOR_FINAL_SELECT_VALUE = "_CONSUMIDOR_FINAL_";
-
 
 export default function DefaultsPage() {
   const [defaults, setDefaults] = useState<DefaultEntry[]>([]);
@@ -72,10 +70,11 @@ export default function DefaultsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const initialFormData = useMemo((): DefaultFormData => ({
-    customerId: null,
-    customerName: 'Consumidor Final',
+    customerId: null, // Customer is now required
+    customerName: '',   // Will be derived from selected customer
     value: 0,
     dueDate: new Date(),
     paymentStatus: 'Pending',
@@ -114,7 +113,7 @@ export default function DefaultsPage() {
   useEffect(() => {
     fetchDefaults();
 
-    const fetchCustomers = async () => {
+    const fetchCustomersData = async () => {
       setIsLoadingCustomers(true);
       try {
         const q = query(collection(db, "customers"), orderBy("name", "asc"));
@@ -132,16 +131,17 @@ export default function DefaultsPage() {
         setIsLoadingCustomers(false);
       }
     };
-    fetchCustomers();
+    fetchCustomersData();
   }, [toast]);
 
   useEffect(() => {
     if (isFormOpen) {
+      setCustomerSearchTerm('');
       if (editingDefault) {
         const customer = customers.find(c => c.id === editingDefault.customerId);
         setFormData({
           customerId: editingDefault.customerId || null,
-          customerName: editingDefault.customerName || (editingDefault.customerId ? (customer?.name || "Cliente não encontrado") : "Consumidor Final"),
+          customerName: editingDefault.customerName || (editingDefault.customerId ? (customer?.name || "Cliente não encontrado") : ""),
           value: editingDefault.value,
           dueDate: editingDefault.dueDate instanceof Date ? editingDefault.dueDate : new Date(editingDefault.dueDate),
           paymentStatus: editingDefault.paymentStatus,
@@ -223,12 +223,29 @@ export default function DefaultsPage() {
       setIsSubmitting(false);
       return;
     }
+
+    if (!formData.customerId) {
+      toast({
+        variant: "destructive",
+        title: "Cliente Obrigatório",
+        description: "Por favor, selecione um cliente para registrar a pendência.",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+    
     setIsSubmitting(true);
 
-    const selectedCustomer = formData.customerId ? customers.find(c => c.id === formData.customerId) : null;
+    const selectedCustomer = customers.find(c => c.id === formData.customerId);
+    if (!selectedCustomer) {
+        toast({ variant: "destructive", title: "Erro de Cliente", description: "Cliente selecionado não foi encontrado. Tente novamente." });
+        setIsSubmitting(false);
+        return;
+    }
+
     const payload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any } = {
-      customerId: formData.customerId || null,
-      customerName: selectedCustomer ? selectedCustomer.name : (formData.customerId === null ? "Consumidor Final" : "Cliente não encontrado"),
+      customerId: formData.customerId,
+      customerName: selectedCustomer.name, // Derived from selected customer
       value: parseFloat(String(formData.value)) || 0,
       dueDate: Timestamp.fromDate(formData.dueDate),
       paymentStatus: formData.paymentStatus,
@@ -263,6 +280,14 @@ export default function DefaultsPage() {
   };
 
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const filteredCustomersForSelect = useMemo(() => {
+    if (!customerSearchTerm) return customers;
+    return customers.filter(customer =>
+        customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
+    );
+  }, [customers, customerSearchTerm]);
+
 
   return (
     <div>
@@ -347,20 +372,42 @@ export default function DefaultsPage() {
             <form onSubmit={handleFormSubmit} id="default-form" className="py-4 pr-6 space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="customer" className="text-muted-foreground">Cliente</Label>
-                <Select
-                    value={formData.customerId || CONSUMIDOR_FINAL_SELECT_VALUE}
+                 <Select
+                    value={formData.customerId || ""}
                     onValueChange={val => {
                         const selectedCust = customers.find(c => c.id === val);
-                        setFormData({...formData, customerId: val === CONSUMIDOR_FINAL_SELECT_VALUE ? null : val, customerName: val === CONSUMIDOR_FINAL_SELECT_VALUE ? "Consumidor Final" : (selectedCust?.name || "")})
+                        setFormData({...formData, customerId: val, customerName: selectedCust?.name || "" });
+                        setCustomerSearchTerm('');
+                    }}
+                    onOpenChange={(isOpen) => {
+                        if (!isOpen) {
+                            setCustomerSearchTerm('');
+                        }
                     }}
                     disabled={isSubmitting || isLoadingCustomers}
                 >
                   <SelectTrigger className="w-full bg-input text-foreground">
-                    <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Consumidor Final"} />
+                    <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : (customers.length === 0 ? "Nenhum cliente cadastrado" : "Selecione um cliente")} />
                   </SelectTrigger>
                   <SelectContent>
-                     <SelectItem value={CONSUMIDOR_FINAL_SELECT_VALUE}>Consumidor Final</SelectItem>
-                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    <div className="p-2 sticky top-0 bg-popover z-10">
+                        <Input
+                            placeholder="Pesquisar cliente..."
+                            value={customerSearchTerm}
+                            onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                            className="mb-2 bg-input text-foreground"
+                            onClick={(e) => e.stopPropagation()} 
+                        />
+                    </div>
+                    {isLoadingCustomers ? (
+                        <div className="p-2 text-center text-muted-foreground">Carregando clientes...</div>
+                    ) : customers.length === 0 ? (
+                          <div className="p-2 text-center text-muted-foreground">Nenhum cliente cadastrado.</div>
+                    ) : filteredCustomersForSelect.length === 0 && customerSearchTerm ? (
+                        <div className="p-2 text-center text-muted-foreground">Nenhum cliente encontrado para "{customerSearchTerm}".</div>
+                    ): (
+                        filteredCustomersForSelect.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -425,3 +472,4 @@ export default function DefaultsPage() {
     </div>
   );
 }
+
