@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2 } from "lucide-react";
+import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -19,15 +19,15 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO, getISOWeek, getYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, parseISO, getISOWeek, getYear, addDays, isAfter, startOfToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp, limit as firestoreLimit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, Timestamp, limit as firestoreLimit, where } from "firebase/firestore";
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
-import type { Sale } from "./sales/actions"; // Import Sale type
-import type { Customer } from "./customers/actions"; // Import Customer type
+import type { Sale } from "./sales/actions";
+import type { Customer } from "./customers/actions";
 
 
 const salesBarChartConfig = {
@@ -95,6 +95,16 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
   );
 };
 
+// Helper function to check if a string is a valid YYYY-MM-DD date
+const isValidPredictionDateString = (dateString?: string | null): boolean => {
+  if (!dateString) return false;
+  // Basic check for YYYY-MM-DD format and if it parses to a valid date
+  const regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!regex.test(dateString)) return false;
+  const date = parseISO(dateString); // parseISO expects YYYY-MM-DD
+  return !isNaN(date.getTime()) && date.getFullYear() > 1970; // Basic validity check
+};
+
 
 export default function DashboardPage() {
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null);
@@ -111,7 +121,6 @@ export default function DashboardPage() {
   const [editedPrices, setEditedPrices] = useState(gasPrices);
   const [isEditingPrices, setIsEditingPrices] = useState(false);
 
-  // State for dynamic KPIs
   const [totalSalesMonth, setTotalSalesMonth] = useState<number | null>(null);
   const [paidSalesMonthCount, setPaidSalesMonthCount] = useState<number | null>(null);
   const [averageTicketMonth, setAverageTicketMonth] = useState<number | null>(null);
@@ -124,6 +133,10 @@ export default function DashboardPage() {
   const [isLoadingRecentSales, setIsLoadingRecentSales] = useState(true);
   const [dynamicSalesChartData, setDynamicSalesChartData] = useState<any[]>([]);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null);
+
+  const [upcomingPurchases, setUpcomingPurchases] = useState<Customer[]>([]);
+  const [isLoadingUpcomingPurchases, setIsLoadingUpcomingPurchases] = useState(true);
+
 
   useEffect(() => {
     setLastUpdatedTime(new Date());
@@ -213,7 +226,7 @@ export default function DashboardPage() {
             const weekNumber = getISOWeek(saleDate);
             const weekKey = `${currentYear}-W${weekNumber}`;
             if (!weeklySalesData[weekKey]) {
-              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0, mesAnterior: 2000 }; // Placeholder for mesAnterior
+              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0, mesAnterior: 2000 }; 
             }
             weeklySalesData[weekKey].vendas += sale.value;
           }
@@ -253,10 +266,56 @@ export default function DashboardPage() {
       }
     };
 
+    const fetchUpcomingPurchases = async () => {
+      setIsLoadingUpcomingPurchases(true);
+      try {
+        const today = startOfToday();
+        const sevenDaysFromNow = addDays(today, 7);
+
+        const q = query(
+          collection(db, "customers"),
+          where("data_prevista_proxima_compra", "!=", null) 
+        );
+        const querySnapshot = await getDocs(q);
+        
+        const potentialPurchases = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        } as Customer));
+
+        const filteredPurchases = potentialPurchases
+          .filter(customer => {
+            if (customer.data_prevista_proxima_compra && isValidPredictionDateString(customer.data_prevista_proxima_compra)) {
+              const predictedDate = parseISO(customer.data_prevista_proxima_compra);
+              return isAfter(predictedDate, today) && isWithinInterval(predictedDate, { start: today, end: sevenDaysFromNow });
+            }
+            return false;
+          })
+          .sort((a, b) => {
+             // Ensure data_prevista_proxima_compra is not undefined before parsing
+            if (!a.data_prevista_proxima_compra || !b.data_prevista_proxima_compra) return 0;
+            return parseISO(a.data_prevista_proxima_compra).getTime() - parseISO(b.data_prevista_proxima_compra).getTime();
+          })
+          .slice(0, 5); // Limit to 5 upcoming purchases
+
+        setUpcomingPurchases(filteredPurchases);
+      } catch (error) {
+        console.error("Error fetching upcoming purchases: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar previsões",
+          description: "Não foi possível carregar as próximas compras previstas.",
+        });
+      } finally {
+        setIsLoadingUpcomingPurchases(false);
+      }
+    };
+
     fetchStockMovements();
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
+    fetchUpcomingPurchases();
   }, [toast]);
 
   const handleEditPrices = () => {
@@ -265,7 +324,6 @@ export default function DashboardPage() {
   };
 
   const handleSavePrices = () => {
-    // TODO: Persist prices, e.g., to Firestore in a 'settings' collection
     setGasPrices(editedPrices);
     setIsEditingPrices(false);
     toast({
@@ -419,9 +477,7 @@ export default function DashboardPage() {
       </Card>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Coluna Esquerda */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Visão Geral de Vendas */}
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -494,7 +550,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
                 <div className="text-3xl font-bold text-foreground flex items-center">
-                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23% {/* Placeholder */}
+                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
                 </div>
                 {lastUpdatedTime ? (
                   <p className="text-xs text-muted-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
@@ -505,7 +561,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Nível de Estoque */}
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -575,7 +630,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Métricas Chave */}
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <CardTitle className="text-xl flex items-center text-foreground">
@@ -602,9 +656,57 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Coluna Direita */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Clientes Inadimplentes */}
+          <Card className="shadow-sm bg-card">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl flex items-center text-foreground">
+                  <CalendarClock className="mr-2 h-5 w-5 text-foreground" />
+                  Próximas Compras (IA)
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
+                  <Link href="/customers">Ver Clientes <ArrowRight className="ml-1 h-3 w-3"/></Link>
+                </Button>
+              </div>
+              <CardDescription>Clientes com previsão de compra nos próximos 7 dias.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingUpcomingPurchases ? (
+                <div className="flex justify-center items-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="ml-2 text-sm text-muted-foreground">Carregando previsões...</p>
+                </div>
+              ) : (
+                <>
+                  {upcomingPurchases.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-foreground">Cliente</TableHead>
+                          <TableHead className="text-foreground text-right">Data Prevista</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {upcomingPurchases.map((customer) => (
+                          <TableRow key={customer.id}>
+                            <TableCell className="font-medium text-card-foreground">{customer.name}</TableCell>
+                            <TableCell className="text-card-foreground text-right">
+                              {customer.data_prevista_proxima_compra && isValidPredictionDateString(customer.data_prevista_proxima_compra)
+                                ? format(parseISO(customer.data_prevista_proxima_compra), "dd/MM/yy", { locale: ptBR })
+                                : customer.data_prevista_proxima_compra}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-4">Nenhuma compra prevista para os próximos 7 dias.</p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -653,7 +755,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Vendas Recentes */}
           <Card className="shadow-sm bg-card">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -703,3 +804,5 @@ export default function DashboardPage() {
   );
 }
 
+
+    
