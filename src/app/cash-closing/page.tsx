@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Printer, DollarSign, ShoppingCart, BarChart2 } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay, subHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -26,7 +26,7 @@ import {
   Timestamp,
   orderBy,
 } from "firebase/firestore";
-import type { Sale } from "../sales/actions"; // Assuming Sale type is defined here
+import type { Sale } from "../sales/actions"; 
 import { useAuth } from "@/contexts/auth-context";
 
 interface DailySummary {
@@ -54,15 +54,111 @@ export default function CashClosingPage() {
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser && process.env.NODE_ENV !== 'development') { // Allow mock data in dev without user
       setIsLoading(false);
-      // Optionally redirect to login or show a message
       return;
     }
 
     const fetchDailySales = async () => {
       setIsLoading(true);
       try {
+        // --- INÍCIO DOS DADOS FICTÍCIOS ---
+        // Comente esta seção e descomente a busca no Firestore abaixo para usar dados reais.
+        const today = new Date();
+        const mockSalesData: Sale[] = [
+          {
+            id: "mock1",
+            customerId: "cust123",
+            customerName: "João Silva",
+            value: 55.75,
+            paymentMethod: "Pix",
+            date: Timestamp.fromDate(subHours(today, 2)), // Hoje, 2 horas atrás
+            status: "Paid",
+            gasCanistersQuantity: 1,
+            observations: "Entrega rápida.",
+            subtractFromStock: true,
+            createdAt: Timestamp.fromDate(subHours(today, 2)),
+          },
+          {
+            id: "mock2",
+            customerName: "Consumidor Final",
+            value: 110.00,
+            paymentMethod: "Dinheiro",
+            date: Timestamp.fromDate(subHours(today, 1)), // Hoje, 1 hora atrás
+            status: "Paid",
+            gasCanistersQuantity: 1,
+            observations: "",
+            subtractFromStock: true,
+            createdAt: Timestamp.fromDate(subHours(today, 1)),
+          },
+          {
+            id: "mock3",
+            customerId: "cust456",
+            customerName: "Maria Oliveira",
+            value: 75.50,
+            paymentMethod: "Cartão de Crédito",
+            date: Timestamp.fromDate(subHours(today, 3)), // Hoje, 3 horas atrás
+            status: "Paid",
+            gasCanistersQuantity: 1,
+            observations: "Cliente pediu troco para R$100.",
+            subtractFromStock: true,
+            createdAt: Timestamp.fromDate(subHours(today, 3)),
+          },
+           {
+            id: "mock4",
+            customerName: "Consumidor Final",
+            value: 30.00,
+            paymentMethod: "Pix",
+            date: Timestamp.fromDate(subHours(today, 0.5)), // Hoje, 30 minutos atrás
+            status: "Paid",
+            gasCanistersQuantity: 0, // Ex: venda de um acessório
+            observations: "Apenas mangueira",
+            subtractFromStock: false,
+            createdAt: Timestamp.fromDate(subHours(today, 0.5)),
+          },
+          {
+            id: "mock5",
+            customerId: "cust789",
+            customerName: "Carlos Souza",
+            value: 105.00,
+            paymentMethod: "Talão de luz",
+            date: Timestamp.fromDate(subHours(today, 4)), // Hoje, 4 horas atrás
+            status: "Paid", // Assumindo que foi pago no dia para constar no fechamento
+            paymentDueDate: Timestamp.fromDate(today),
+            gasCanistersQuantity: 1,
+            observations: "Pago no ato.",
+            subtractFromStock: true,
+            createdAt: Timestamp.fromDate(subHours(today, 4)),
+          },
+           {
+            id: "mock6", // Venda pendente, não deve aparecer no resumo de pagos
+            customerId: "cust101",
+            customerName: "Ana Pereira",
+            value: 110.00,
+            paymentMethod: "Pix",
+            date: Timestamp.fromDate(subHours(today, 1)),
+            status: "Pending",
+            paymentDueDate: Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000)), // Vence amanhã
+            gasCanistersQuantity: 1,
+            observations: "Pagamento agendado.",
+            subtractFromStock: true,
+            createdAt: Timestamp.fromDate(subHours(today, 1)),
+          },
+        ];
+        
+        const salesDataToProcess = mockSalesData.map(sale => ({
+          ...sale,
+          date: (sale.date as Timestamp).toDate(),
+          paymentDueDate: sale.paymentDueDate ? (sale.paymentDueDate as Timestamp).toDate() : null,
+        })) as unknown as Sale[]; // Cast to Sale[] after converting Timestamps
+
+        setDailySales(salesDataToProcess.filter(s => s.status === "Paid"));
+        calculateSummary(salesDataToProcess.filter(s => s.status === "Paid"));
+        // --- FIM DOS DADOS FICTÍCIOS ---
+
+        /*
+        // --- INÍCIO DA BUSCA NO FIRESTORE (DADOS REAIS) ---
+        // Descomente esta seção e comente a seção de dados fictícios acima para usar dados reais.
         const todayStart = startOfDay(currentDate);
         const todayEnd = endOfDay(currentDate);
 
@@ -86,6 +182,9 @@ export default function CashClosingPage() {
         });
         setDailySales(salesData);
         calculateSummary(salesData);
+        // --- FIM DA BUSCA NO FIRESTORE ---
+        */
+
       } catch (error) {
         console.error("Error fetching daily sales: ", error);
         toast({
@@ -101,12 +200,15 @@ export default function CashClosingPage() {
     };
 
     fetchDailySales();
-  }, [currentUser, toast, currentDate]);
+  // Removed currentUser from dependencies for mock data to work without login in dev
+  }, [toast, currentDate, currentUser]);
+
 
   const calculateSummary = (sales: Sale[]) => {
     const newSummary: DailySummary = { ...initialSummary, salesByPaymentMethod: {} };
     sales.forEach(sale => {
-      if (sale.status === "Paid") {
+      // Ensure we are only processing sales that are marked as Paid for the summary
+      if (sale.status === "Paid") { 
         newSummary.totalSalesValue += sale.value;
         newSummary.salesCount++;
         const method = sale.paymentMethod || "Não especificado";
@@ -133,6 +235,15 @@ export default function CashClosingPage() {
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-3 text-muted-foreground">Carregando dados do fechamento...</p>
+      </div>
+    );
+  }
+  
+  if (!currentUser && process.env.NODE_ENV !== 'development') {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
+        <p className="text-muted-foreground">Por favor, faça login para acessar esta página.</p>
+        <Button onClick={() => window.location.href = '/login'} className="mt-4">Ir para Login</Button>
       </div>
     );
   }
@@ -192,7 +303,7 @@ export default function CashClosingPage() {
           <CardDescription>Lista de todas as vendas pagas realizadas hoje.</CardDescription>
         </CardHeader>
         <CardContent>
-          {dailySales.length > 0 ? (
+          {dailySales.filter(sale => sale.status === "Paid").length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -204,7 +315,7 @@ export default function CashClosingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dailySales.map((sale) => (
+                {dailySales.filter(sale => sale.status === "Paid").map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
                     <TableCell>{format(sale.date, "HH:mm:ss")}</TableCell>
@@ -243,3 +354,6 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon }) => {
     </Card>
   );
 };
+
+
+    
