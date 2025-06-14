@@ -130,26 +130,35 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLastUpdatedTime(new Date());
+    let activeGasPrices = { ...defaultGasPrices }; // Start with defaults
 
-    const storedPrices = localStorage.getItem('gasPrices');
-    if (storedPrices) {
+    const storedPricesJSON = localStorage.getItem('gasPrices');
+    if (storedPricesJSON) {
       try {
-        const parsedPrices = JSON.parse(storedPrices);
-        if (parsedPrices && typeof parsedPrices.current === 'number' && typeof parsedPrices.cash === 'number' && typeof parsedPrices.card === 'number') {
-          setGasPrices(parsedPrices);
-          setEditedPrices(parsedPrices);
+        const parsedPrices = JSON.parse(storedPricesJSON);
+        if (
+          parsedPrices &&
+          typeof parsedPrices.current === 'number' &&
+          typeof parsedPrices.cash === 'number' &&
+          typeof parsedPrices.card === 'number'
+        ) {
+          activeGasPrices = parsedPrices; // Use prices from localStorage if valid
         } else {
-           localStorage.removeItem('gasPrices'); // Remove invalid data
+          // Invalid data structure, remove it
+          localStorage.removeItem('gasPrices');
         }
-      } catch (e) {
-        console.error("Failed to parse gas prices from localStorage", e);
+      } catch (error) {
+        console.error("Failed to parse gas prices from localStorage:", error);
         localStorage.removeItem('gasPrices'); // Remove corrupted data
       }
     }
+    setGasPrices(activeGasPrices);
+    setEditedPrices(activeGasPrices); // Ensure both states are updated from the same source
   }, []);
 
 
   useEffect(() => {
+    // This effect fetches other data, keep it separate from price loading
     const fetchStockMovements = async () => {
       setIsLoadingStock(true);
       try {
@@ -280,7 +289,7 @@ export default function DashboardPage() {
   }, [toast]);
 
   const handleEditPrices = () => {
-    setEditedPrices(gasPrices); // Initialize edit form with current saved prices
+    setEditedPrices(gasPrices); 
     setIsEditingPrices(true);
   };
 
@@ -304,7 +313,7 @@ export default function DashboardPage() {
   };
 
   const handleCancelEditPrices = () => {
-    setEditedPrices(gasPrices); // Reset changes to currently saved prices
+    setEditedPrices(gasPrices); 
     setIsEditingPrices(false);
   };
 
