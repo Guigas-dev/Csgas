@@ -20,11 +20,19 @@ export async function clearFirestoreCollection(collectionName: ClearableCollecti
       return { success: true, message: `Collection "${collectionName}" is already empty.` };
     }
 
-    const batch = writeBatch(db);
-    querySnapshot.docs.forEach(docSnapshot => {
-      batch.delete(docSnapshot.ref);
-    });
-    await batch.commit();
+    const BATCH_SIZE = 499; // Firestore limit is 500 operations per batch
+    const docRefs = querySnapshot.docs.map(docSnapshot => docSnapshot.ref);
+    let deletedCount = 0;
+
+    for (let i = 0; i < docRefs.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = docRefs.slice(i, i + BATCH_SIZE);
+      chunk.forEach(docRef => {
+        batch.delete(docRef);
+      });
+      await batch.commit();
+      deletedCount += chunk.length;
+    }
 
     // Revalidate relevant paths
     switch (collectionName) {
@@ -47,11 +55,11 @@ export async function clearFirestoreCollection(collectionName: ClearableCollecti
         revalidatePath('/');
         break;
     }
-    // Revalidate users page itself in case any data displayed there is affected (though currently not)
+    // Revalidate users page itself
     revalidatePath('/users');
 
 
-    return { success: true, message: `All records from collection "${collectionName}" have been removed.` };
+    return { success: true, message: `${deletedCount} records from collection "${collectionName}" have been removed.` };
   } catch (error) {
     console.error(`Error clearing collection ${collectionName}:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
