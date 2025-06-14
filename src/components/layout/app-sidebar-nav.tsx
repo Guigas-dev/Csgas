@@ -26,6 +26,7 @@ import {
   Bell,
   Flame, // Changed from custom SVG to Flame icon
   Loader2, 
+  ClipboardList, // Added for Cash Closing
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context"; 
@@ -41,6 +42,7 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
+  { href: "/cash-closing", label: "Fechamento de Caixa", icon: ClipboardList }, // New item
   { href: "/notifications", label: "Notificações", icon: Bell },
   { href: "/users", label: "Usuários", icon: UserCog },
 ];
