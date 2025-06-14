@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, TrendingUp, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2, CalendarClock } from "lucide-react";
+import { ArrowRight, UserX, Archive, ListChecks, Users, DollarSign, ShoppingCart, CheckCircle2, AlertTriangle, PackageSearch, Flame, Banknote, CreditCard, Edit, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, getISOWeek, getYear, parseISO, addDays, isAfter, startOfToday } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, isToday, getISOWeek, getYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -27,17 +27,13 @@ import { collection, getDocs, query, orderBy, Timestamp, where, limit } from "fi
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
 import type { Sale } from "./sales/actions";
-import type { Customer } from "./customers/actions";
+// import type { Customer } from "./customers/actions"; // Customer type not directly used in this file for KPIs
 
 
 const salesBarChartConfig = {
   vendas: {
     label: "Vendas Atuais",
     color: "hsl(var(--chart-1))",
-  },
-  mesAnterior: {
-    label: "Mês Anterior",
-    color: "hsl(var(--chart-2))",
   },
 };
 
@@ -60,13 +56,12 @@ interface KpiCardProps {
   value: string | number | null | undefined;
   subText?: string;
   icon: React.ReactNode;
-  trendIcon?: React.ReactNode;
   valueColor?: string;
   subTextColor?: string;
   isLoading?: boolean;
 }
 
-const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIcon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
+const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
   const shouldFormatCurrency = typeof value === 'number' &&
     (title.toLowerCase().includes("vendas totais") ||
      title.toLowerCase().includes("ticket médio") ||
@@ -89,7 +84,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, trendIco
         )}
         {subText && !isLoading && (
           <p className={`text-xs ${subTextColor} flex items-center`}>
-            {subText} {trendIcon && <span className="ml-1">{trendIcon}</span>}
+            {subText}
           </p>
         )}
       </CardContent>
@@ -130,7 +125,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLastUpdatedTime(new Date());
-    let activeGasPrices = { ...defaultGasPrices }; // Start with defaults
+    let activeGasPrices = { ...defaultGasPrices }; 
 
     const storedPricesJSON = localStorage.getItem('gasPrices');
     if (storedPricesJSON) {
@@ -142,23 +137,21 @@ export default function DashboardPage() {
           typeof parsedPrices.cash === 'number' &&
           typeof parsedPrices.card === 'number'
         ) {
-          activeGasPrices = parsedPrices; // Use prices from localStorage if valid
+          activeGasPrices = parsedPrices; 
         } else {
-          // Invalid data structure, remove it
           localStorage.removeItem('gasPrices');
         }
       } catch (error) {
         console.error("Failed to parse gas prices from localStorage:", error);
-        localStorage.removeItem('gasPrices'); // Remove corrupted data
+        localStorage.removeItem('gasPrices'); 
       }
     }
     setGasPrices(activeGasPrices);
-    setEditedPrices(activeGasPrices); // Ensure both states are updated from the same source
+    setEditedPrices(activeGasPrices); 
   }, []);
 
 
   useEffect(() => {
-    // This effect fetches other data, keep it separate from price loading
     const fetchStockMovements = async () => {
       setIsLoadingStock(true);
       try {
@@ -225,7 +218,7 @@ export default function DashboardPage() {
         let currentMonthSalesCount = 0;
         let todaySalesCount = 0;
 
-        const weeklySalesData: { [week: string]: { weekLabel: string, vendas: number, mesAnterior: number } } = {};
+        const weeklySalesData: { [week: string]: { weekLabel: string, vendas: number } } = {};
         const currentYear = getYear(now);
 
         salesData.forEach(sale => {
@@ -241,7 +234,7 @@ export default function DashboardPage() {
             const weekNumber = getISOWeek(saleDate);
             const weekKey = `${currentYear}-W${weekNumber}`;
             if (!weeklySalesData[weekKey]) {
-              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0, mesAnterior: 2000 }; 
+              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0 }; 
             }
             weeklySalesData[weekKey].vendas += sale.value;
           }
@@ -251,7 +244,7 @@ export default function DashboardPage() {
         });
         
         const chartDataFormatted = Object.values(weeklySalesData).sort((a,b) => a.weekLabel.localeCompare(b.weekLabel));
-        setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ date: format(now, "MMM dd", {locale: ptBR}), vendas: 0, mesAnterior: 0 }]);
+        setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ weekLabel: format(now, "MMM dd", {locale: ptBR}), vendas: 0 }]);
 
 
         setTotalSalesMonth(currentMonthSalesValue);
@@ -338,21 +331,15 @@ export default function DashboardPage() {
         <KpiCard
           title="Vendas Totais (Mês)"
           value={totalSalesMonth}
-          subText="+15% Mês Anterior" 
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
-          subTextColor="text-success"
           isLoading={isLoadingSalesKpi}
         />
         <KpiCard
           title="Vendas Pagas (Mês)"
           value={paidSalesMonthCount}
-          subText="+5 Mês Anterior" 
           icon={<CheckCircle2 className="h-5 w-5 text-foreground" />}
-          trendIcon={<TrendingUp className="h-4 w-4 text-success" />}
           valueColor="text-foreground"
-          subTextColor="text-success"
           isLoading={isLoadingSalesKpi}
         />
         <KpiCard
@@ -522,12 +509,6 @@ export default function DashboardPage() {
                       content={<ChartTooltipContent indicator="dot" />}
                     />
                     <Bar
-                      dataKey="mesAnterior"
-                      fill="hsl(var(--chart-2))"
-                      radius={[4, 4, 0, 0]}
-                      barSize={15}
-                    />
-                    <Bar
                       dataKey="vendas"
                       fill="hsl(var(--chart-1))"
                       radius={[4, 4, 0, 0]}
@@ -539,9 +520,8 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
-                <div className="text-3xl font-bold text-foreground flex items-center">
-                  <TrendingUp className="mr-2 h-7 w-7 text-foreground" /> +19.23%
-                </div>
+                {/* Placeholder de tendência removido */}
+                <div></div> 
                 {lastUpdatedTime ? (
                   <p className="text-xs text-muted-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                 ) : (
@@ -745,3 +725,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
