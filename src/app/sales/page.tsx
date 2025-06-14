@@ -72,11 +72,10 @@ import type { Customer } from "../customers/actions";
 import type { StockMovementEntry } from "../stock/actions";
 import { useAuth } from "@/contexts/auth-context";
 import type { DefaultEntry } from "../defaults/actions";
-// import { predictNextPurchase, type PredictNextPurchaseInput } from "@/ai/flows/predict-next-purchase-flow"; // Removed AI import
-// import { revalidatePath } from 'next/cache'; // Not needed here after AI removal
 
+const basePaymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"];
+const customerSpecificPaymentMethod = "Talão de luz";
 
-const paymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Boleto"];
 const saleStatuses = [
     { value: "Paid", label: "Pago"},
     { value: "Pending", label: "Pendente"},
@@ -123,12 +122,21 @@ export default function SalesPage() {
   }), []);
   const [filterCriteria, setFilterCriteria] = useState<SalesFilterCriteria>(initialFilterCriteria);
   
+  const getAvailablePaymentMethods = useCallback((currentSaleMode: 'quick' | 'customer' | null, currentEditingSale: Sale | null) => {
+    const isCustomerSale = currentSaleMode === 'customer' || (currentEditingSale && currentEditingSale.customerId);
+    if (isCustomerSale) {
+      return [...basePaymentMethods, customerSpecificPaymentMethod];
+    }
+    return basePaymentMethods;
+  }, []);
+
+  const availablePaymentMethods = useMemo(() => getAvailablePaymentMethods(saleMode, editingSale), [saleMode, editingSale, getAvailablePaymentMethods]);
 
   const initialFormData = useMemo((): SaleFormData => ({
     customerId: null,
     customerName: "Consumidor Final", 
     value: 0,
-    paymentMethod: paymentMethods[0] || '',
+    paymentMethod: basePaymentMethods[0] || '',
     date: new Date(),
     status: 'Paid',
     paymentDueDate: null,
@@ -235,14 +243,23 @@ export default function SalesPage() {
   useEffect(() => {
     if (isFormOpen) {
       setCustomerSearchTerm(''); 
+      const currentAvailablePaymentMethods = getAvailablePaymentMethods(saleMode, editingSale);
+      let defaultPaymentMethod = currentAvailablePaymentMethods[0] || '';
+
       if (editingSale) {
         setSaleMode(editingSale.customerId ? 'customer' : 'quick');
         const customer = customers.find(c => c.id === editingSale.customerId);
+        // Ensure existing payment method is valid for the current sale mode
+        if (!currentAvailablePaymentMethods.includes(editingSale.paymentMethod)) {
+          defaultPaymentMethod = currentAvailablePaymentMethods[0] || '';
+        } else {
+          defaultPaymentMethod = editingSale.paymentMethod;
+        }
         setFormData({
           customerId: editingSale.customerId || null,
           customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "") : "Consumidor Final"),
           value: editingSale.value,
-          paymentMethod: editingSale.paymentMethod,
+          paymentMethod: defaultPaymentMethod,
           date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
           status: editingSale.status,
           paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
@@ -254,6 +271,7 @@ export default function SalesPage() {
          if (saleMode === 'quick') {
             setFormData({
                 ...initialFormData, 
+                paymentMethod: currentAvailablePaymentMethods[0] || '',
                 customerId: null,
                 date: new Date(),
                 paymentDueDate: null,
@@ -261,6 +279,7 @@ export default function SalesPage() {
         } else { 
             setFormData({
                 ...initialFormData,
+                paymentMethod: currentAvailablePaymentMethods[0] || '',
                 customerId: null, 
                 customerName: "", 
                 date: new Date(),
@@ -269,7 +288,7 @@ export default function SalesPage() {
         }
       }
     }
-  }, [isFormOpen, editingSale, customers, initialFormData, saleMode]);
+  }, [isFormOpen, editingSale, customers, initialFormData, saleMode, getAvailablePaymentMethods]);
 
   useEffect(() => {
     if (formData.status !== 'Pending') {
@@ -298,6 +317,7 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
+    // saleMode will be set in the useEffect for isFormOpen
     setIsFormOpen(true);
   };
 
@@ -445,8 +465,6 @@ export default function SalesPage() {
                      " e quaisquer pendências/estoque associados foram atualizados." 
       });
       
-      // AI Prediction Logic Removed
-
       setIsFormOpen(false);
       await revalidateSalesRelatedPages(); 
       fetchSales();
@@ -492,6 +510,9 @@ export default function SalesPage() {
         customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
     );
   }, [customers, customerSearchTerm]);
+
+  const allPaymentMethodsForFilter = useMemo(() => [...basePaymentMethods, customerSpecificPaymentMethod], []);
+
 
   return (
     <div>
@@ -765,12 +786,16 @@ export default function SalesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="paymentMethod" className="text-muted-foreground">Forma de Pagamento</Label>
-                  <Select value={formData.paymentMethod} onValueChange={val => setFormData({...formData, paymentMethod: val})} disabled={isSubmitting}>
+                  <Select 
+                    value={formData.paymentMethod} 
+                    onValueChange={val => setFormData({...formData, paymentMethod: val})} 
+                    disabled={isSubmitting}
+                  >
                     <SelectTrigger className="w-full bg-input text-foreground">
                       <SelectValue placeholder="Selecione a forma" />
                     </SelectTrigger>
                     <SelectContent>
-                      {paymentMethods.map(pm => <SelectItem key={pm} value={pm}>{pm}</SelectItem>)}
+                      {availablePaymentMethods.map(pm => <SelectItem key={pm} value={pm}>{pm}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -912,7 +937,7 @@ export default function SalesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">Todas as formas</SelectItem>
-                    {paymentMethods.map(pm => <SelectItem key={pm} value={pm}>{pm}</SelectItem>)}
+                    {allPaymentMethodsForFilter.map(pm => <SelectItem key={pm} value={pm}>{pm}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -979,3 +1004,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
