@@ -23,10 +23,11 @@ import {
   Archive,
   LogOut,
   UserCog,
-  Loader2, // Import Loader2 for loading state
+  Bell, // Ícone para notificações
+  Loader2, 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/auth-context"; // Import useAuth
+import { useAuth } from "@/contexts/auth-context"; 
 
 const CSGASLogo = () => (
   <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary">
@@ -48,18 +49,16 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
+  { href: "/notifications", label: "Notificações", icon: Bell }, // Novo item de navegação
   { href: "/users", label: "Usuários", icon: UserCog },
 ];
 
 export function AppSidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, loading, signOutUser } = useAuth(); // Use auth context
+  const { currentUser, loading, signOutUser } = useAuth(); 
 
   useEffect(() => {
-    // If auth is not loading and there's no user, redirect to login.
-    // This effect also runs when `currentUser` changes.
-    // Ensure this doesn't run on the login page itself by checking pathname.
     if (!loading && !currentUser && pathname !== '/login') {
       router.push('/login');
     }
@@ -68,12 +67,8 @@ export function AppSidebarNav() {
 
   const handleLogout = async () => {
     await signOutUser();
-    // router.push('/login') is handled by signOutUser or the useEffect above
   };
 
-  // If auth is loading and there's no user yet, show a loading state for the sidebar
-  // or prevent rendering its content to avoid flashes of content.
-  // This could be a more sophisticated skeleton loader.
   if (loading && !currentUser && pathname !== '/login') {
     return (
       <div className="flex flex-col h-full items-center justify-center p-4 bg-sidebar text-sidebar-foreground">
@@ -83,7 +78,6 @@ export function AppSidebarNav() {
     );
   }
   
-  // Do not render sidebar on login page or if user is not authenticated and still loading
   if (pathname === '/login' || (!currentUser && loading)) {
       return null; 
   }
@@ -128,7 +122,7 @@ export function AppSidebarNav() {
           variant="ghost" 
           onClick={handleLogout}
           className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          disabled={loading} // Disable while any auth operation is in progress
+          disabled={loading} 
         >
           {loading && !currentUser ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
           Sair
