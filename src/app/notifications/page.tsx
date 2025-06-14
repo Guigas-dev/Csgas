@@ -22,7 +22,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { format, subDays, subHours, subMinutes } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -46,69 +46,19 @@ interface Notification {
   link?: string;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "stock_low",
-    title: "Estoque Baixo!",
-    description: "Botijões P13 estão com apenas 15 unidades. Considere fazer um novo pedido.",
-    timestamp: subHours(new Date(), 2),
-    read: false,
-    link: "/stock",
-  },
-  {
-    id: "2",
-    type: "new_sale",
-    title: "Nova Venda Registrada",
-    description: "Venda #1025 para João Silva no valor de R$ 115,00.",
-    timestamp: subHours(new Date(), 5),
-    read: true,
-    link: "/sales",
-  },
-  {
-    id: "3",
-    type: "payment_overdue",
-    title: "Pagamento Atrasado",
-    description: "O pagamento de Maria Oliveira (Venda #1023) está atrasado há 3 dias.",
-    timestamp: subDays(new Date(), 3),
-    read: false,
-    link: "/defaults",
-  },
-  {
-    id: "4",
-    type: "payment_received",
-    title: "Pagamento Recebido",
-    description: "Pagamento de R$ 230,00 referente à Venda #1024 (Carlos Pereira) foi confirmado.",
-    timestamp: subHours(new Date(), 20),
-    read: true,
-  },
-  {
-    id: "5",
-    type: "info",
-    title: "Manutenção Programada",
-    description: "O sistema passará por uma breve manutenção no dia 20/07 às 03:00.",
-    timestamp: subDays(new Date(), 1),
-    read: true,
-  },
-  {
-    id: "6",
-    type: "stock_in",
-    title: "Entrada de Estoque",
-    description: "50 unidades de Botijão P13 foram adicionadas ao estoque.",
-    timestamp: subMinutes(new Date(), 30),
-    read: false,
-    link: "/stock",
-  },
-  {
-    id: "7",
-    type: "payment_due",
-    title: "Pagamento Vence Hoje",
-    description: "Lembrete: O pagamento da Venda #1026 para Ana Costa vence hoje.",
-    timestamp: subHours(new Date(), 1),
-    read: false,
-    link: "/defaults"
-  },
-];
+// mockNotifications array has been removed.
+// const mockNotifications: Notification[] = [
+//   {
+//     id: "1",
+//     type: "stock_low",
+//     title: "Estoque Baixo!",
+//     description: "Botijões P13 estão com apenas 15 unidades. Considere fazer um novo pedido.",
+//     timestamp: subHours(new Date(), 2),
+//     read: false,
+//     link: "/stock",
+//   },
+//   // ... other mock notifications removed for brevity
+// ];
 
 const getNotificationIcon = (type: NotificationType, read: boolean): React.ReactNode => {
   const commonClass = "h-5 w-5";
@@ -135,9 +85,16 @@ const getNotificationIcon = (type: NotificationType, read: boolean): React.React
 };
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(
-    mockNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-  );
+  const [notifications, setNotifications] = useState<Notification[]>([]); // Initialize with an empty array
+
+  // useEffect(() => {
+  //   // If you were fetching notifications from an API, you would do it here.
+  //   // For now, we're just using the initial empty state.
+  //   // setNotifications(
+  //   //  mockNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  //   // );
+  // }, []);
+
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
