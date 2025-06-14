@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight, AlertTriangle, DatabaseZap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,20 +22,10 @@ import {
   SheetTitle,
   SheetClose,
 } from "@/components/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -44,8 +34,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { clearFirestoreCollection, type ClearableCollectionName } from "./actions";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
 
@@ -95,10 +83,6 @@ export default function UsersPage() {
   const [formData, setFormData] = useState(initialFormState);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
-  const [collectionToClear, setCollectionToClear] = useState<ClearableCollectionName | null>(null);
-  const [isClearingData, setIsClearingData] = useState(false);
 
 
   useEffect(() => {
@@ -233,49 +217,6 @@ export default function UsersPage() {
         setIsFormOpen(false);
         setIsSubmitting(false);
     }, 1000);
-  };
-
-  const openClearConfirmationDialog = (collectionName: ClearableCollectionName) => {
-    setCollectionToClear(collectionName);
-    setIsAlertDialogOpen(true);
-  };
-
-  const handleConfirmClearData = async () => {
-    if (!collectionToClear) return;
-
-    if (!currentUser) {
-      toast({
-        variant: "destructive",
-        title: "Erro de Autenticação",
-        description: "Você precisa estar logado para limpar os dados.",
-      });
-      setIsAlertDialogOpen(false);
-      return;
-    }
-
-    setIsClearingData(true);
-    const result = await clearFirestoreCollection(collectionToClear);
-
-    if (result.success) {
-      toast({ title: "Dados Limpos!", description: result.message });
-    } else {
-      toast({ variant: "destructive", title: "Erro ao Limpar Dados", description: result.message });
-    }
-
-    setIsAlertDialogOpen(false);
-    setIsClearingData(false);
-    setCollectionToClear(null);
-  };
-
-  const getCollectionDisplayName = (collectionName: ClearableCollectionName | null): string => {
-    if (!collectionName) return "";
-    switch (collectionName) {
-        case "customers": return "Clientes";
-        case "sales": return "Vendas";
-        case "defaults": return "Inadimplências";
-        case "stockMovements": return "Movimentações de Estoque";
-        default: return collectionName;
-    }
   };
 
 
@@ -434,81 +375,7 @@ export default function UsersPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <DatabaseZap className="mr-2 h-5 w-5 text-destructive" />
-            Ferramentas de Limpeza de Dados
-          </CardTitle>
-          <CardDescription>
-            Use estas ferramentas com <strong className="text-destructive">extremo cuidado</strong>. A exclusão de dados é <strong className="text-destructive">permanente</strong>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Abaixo você pode limpar todos os registros de coleções específicas no banco de dados. Esta ação não pode ser desfeita.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button
-              variant="destructive"
-              onClick={() => openClearConfirmationDialog("customers")}
-              disabled={isClearingData}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Limpar Clientes
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => openClearConfirmationDialog("sales")}
-              disabled={isClearingData}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Limpar Vendas
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => openClearConfirmationDialog("defaults")}
-              disabled={isClearingData}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Limpar Inadimplências
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => openClearConfirmationDialog("stockMovements")}
-              disabled={isClearingData}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Limpar Mov. Estoque
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <AlertDialog open={isAlertDialogOpen} onOpenChange={setIsAlertDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
-              <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
-              Confirmar Exclusão de Dados
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Você tem certeza que deseja excluir <strong className="text-destructive">todos os registros</strong> da coleção de <strong className="text-destructive">{getCollectionDisplayName(collectionToClear)}</strong>?
-              Esta ação é <strong className="text-destructive">permanente</strong> e não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClearingData}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmClearData}
-              disabled={isClearingData}
-              className={cn(buttonVariants({ variant: "destructive" }))}
-            >
-              {isClearingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, Excluir Tudo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </div>
   );
 }
-
     
