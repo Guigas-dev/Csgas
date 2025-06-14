@@ -46,6 +46,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { clearFirestoreCollection, type ClearableCollectionName } from "./actions";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 
 interface SystemUser {
@@ -82,6 +83,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { currentUser } = useAuth();
 
   const initialFormState = {
     name: "",
@@ -240,6 +242,16 @@ export default function UsersPage() {
 
   const handleConfirmClearData = async () => {
     if (!collectionToClear) return;
+
+    if (!currentUser) {
+      toast({
+        variant: "destructive",
+        title: "Erro de Autenticação",
+        description: "Você precisa estar logado para limpar os dados.",
+      });
+      setIsAlertDialogOpen(false);
+      return;
+    }
 
     setIsClearingData(true);
     const result = await clearFirestoreCollection(collectionToClear);
