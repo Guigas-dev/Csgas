@@ -10,21 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context"; // Import useAuth
+import { Loader2, Eye, EyeOff, Flame } from "lucide-react"; // Added Flame
+import { useAuth } from "@/contexts/auth-context";
 
 const CSGASLogoFull = () => (
   <div className="flex items-center justify-center mb-6">
-    <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="text-primary mr-3">
-      <defs>
-        <linearGradient id="gradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style={{stopColor: "hsl(var(--primary))", stopOpacity:1}} />
-          <stop offset="100%" style={{stopColor: "hsl(var(--accent))", stopOpacity:1}} />
-        </linearGradient>
-      </defs>
-      <path fill="url(#gradLogin)" d="M50 5 L95 27.5 L95 72.5 L50 95 L5 72.5 L5 27.5 Z M50 15 L85 32.5 V 67.5 L50 85 L15 67.5 V 32.5 Z"></path>
-      <text x="50" y="62" fontSize="40" fill="hsl(var(--primary-foreground))" textAnchor="middle" fontWeight="bold" className="font-headline">V</text>
-    </svg>
+    <Flame className="text-primary mr-3 h-12 w-12" /> {/* Replaced SVG with Flame icon */}
     <h1 className="text-3xl font-bold text-foreground font-headline">CS GAS</h1>
   </div>
 );
@@ -32,7 +23,7 @@ const CSGASLogoFull = () => (
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { currentUser, signInWithEmail, loading: authLoading } = useAuth(); // Use auth context
+  const { currentUser, signInWithEmail, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("admin@vendafacil.com");
   const [password, setPassword] = useState("password");
   const [rememberMe, setRememberMe] = useState(false);
@@ -41,7 +32,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (currentUser) {
-      router.push("/"); // Redirect if already logged in
+      router.push("/"); 
     }
   }, [currentUser, router]);
 
@@ -63,7 +54,7 @@ export default function LoginPage() {
         switch (result.error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential': // Covers both user-not-found and wrong-password in newer SDKs
+          case 'auth/invalid-credential':
             errorMessage = "Email ou senha inválidos.";
             break;
           case 'auth/invalid-email':
@@ -83,7 +74,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
 
-  if (authLoading || currentUser) { // Show loader if auth is loading or user is logged in (and redirecting)
+  if (authLoading || currentUser) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
