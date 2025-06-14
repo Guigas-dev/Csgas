@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -41,7 +42,7 @@ const salesBarChartConfig = {
 };
 
 const maxStock = 100;
-const LOW_STOCK_THRESHOLD = 20; // Limite para alerta de estoque baixo
+const LOW_STOCK_THRESHOLD = 20; 
 
 const stockPieChartConfig = {
   value: { label: "Unidades" },
@@ -104,12 +105,13 @@ export default function DashboardPage() {
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
   const { toast } = useToast();
 
-  const [gasPrices, setGasPrices] = useState({
+  const defaultGasPrices = {
     current: 115.00,
     cash: 110.00,
     card: 118.00,
-  });
-  const [editedPrices, setEditedPrices] = useState(gasPrices);
+  };
+  const [gasPrices, setGasPrices] = useState(defaultGasPrices);
+  const [editedPrices, setEditedPrices] = useState(defaultGasPrices);
   const [isEditingPrices, setIsEditingPrices] = useState(false);
 
   const [totalSalesMonth, setTotalSalesMonth] = useState<number | null>(null);
@@ -127,8 +129,23 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    // Client-side only effect for setting initial time to avoid hydration mismatch
     setLastUpdatedTime(new Date());
+
+    const storedPrices = localStorage.getItem('gasPrices');
+    if (storedPrices) {
+      try {
+        const parsedPrices = JSON.parse(storedPrices);
+        if (parsedPrices && typeof parsedPrices.current === 'number' && typeof parsedPrices.cash === 'number' && typeof parsedPrices.card === 'number') {
+          setGasPrices(parsedPrices);
+          setEditedPrices(parsedPrices);
+        } else {
+           localStorage.removeItem('gasPrices'); // Remove invalid data
+        }
+      } catch (e) {
+        console.error("Failed to parse gas prices from localStorage", e);
+        localStorage.removeItem('gasPrices'); // Remove corrupted data
+      }
+    }
   }, []);
 
 
@@ -263,20 +280,31 @@ export default function DashboardPage() {
   }, [toast]);
 
   const handleEditPrices = () => {
-    setEditedPrices(gasPrices);
+    setEditedPrices(gasPrices); // Initialize edit form with current saved prices
     setIsEditingPrices(true);
   };
 
   const handleSavePrices = () => {
     setGasPrices(editedPrices);
+    try {
+      localStorage.setItem('gasPrices', JSON.stringify(editedPrices));
+      toast({
+        title: "Preços Atualizados!",
+        description: "Os preços do gás foram salvos com sucesso no seu navegador.",
+      });
+    } catch (e) {
+      console.error("Failed to save gas prices to localStorage", e);
+      toast({
+        variant: "destructive",
+        title: "Erro ao Salvar Preços",
+        description: "Não foi possível salvar os preços localmente.",
+      });
+    }
     setIsEditingPrices(false);
-    toast({
-      title: "Preços Atualizados!",
-      description: "Os preços do gás foram salvos com sucesso.",
-    });
   };
 
   const handleCancelEditPrices = () => {
+    setEditedPrices(gasPrices); // Reset changes to currently saved prices
     setIsEditingPrices(false);
   };
 
