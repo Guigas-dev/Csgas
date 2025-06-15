@@ -26,8 +26,15 @@ import {
   Timestamp,
   orderBy,
 } from "firebase/firestore";
-import type { Sale } from "../sales/actions"; 
+import type { Sale as FirestoreSale } from "../sales/actions"; 
 import { useAuth } from "@/contexts/auth-context";
+
+// Local type for sales data transformed for this page
+type CashClosingSale = Omit<FirestoreSale, 'date' | 'paymentDueDate' | 'lucro_bruto'> & {
+  date: Date;
+  paymentDueDate: Date | null;
+  lucro_bruto: number; // Ensured to be a number
+};
 
 interface DailySummary {
   totalSalesValue: number;
@@ -48,7 +55,7 @@ const initialSummary: DailySummary = {
 };
 
 export default function CashClosingPage() {
-  const [dailySales, setDailySales] = useState<Sale[]>([]);
+  const [dailySales, setDailySales] = useState<CashClosingSale[]>([]);
   const [summary, setSummary] = useState<DailySummary>(initialSummary);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -59,7 +66,12 @@ export default function CashClosingPage() {
     const fetchDailySales = async () => {
       setIsLoading(true);
       try {
-        if (!currentUser && process.env.NODE_ENV !== 'development') { 
+        // Stricter check: If there's no currentUser, don't attempt to fetch.
+        // The component's render logic will handle showing a login prompt if necessary (for non-dev).
+        if (!currentUser) {
+          // console.log("CashClosing: No currentUser, aborting fetch.");
+          setDailySales([]); 
+          setSummary(initialSummary);
           setIsLoading(false);
           return;
         }
@@ -81,11 +93,22 @@ export default function CashClosingPage() {
           const data = docSnap.data();
           return {
             id: docSnap.id,
-            ...data,
+            // Spread other fields from FirestoreSale
+            customerId: data.customerId || null,
+            customerName: data.customerName || undefined,
+            value: data.value,
+            paymentMethod: data.paymentMethod,
+            status: data.status,
+            gasCanistersQuantity: data.gasCanistersQuantity,
+            observations: data.observations,
+            subtractFromStock: data.subtractFromStock,
+            createdAt: data.createdAt, // Keep as Timestamp if not used directly, or convert
+            updatedAt: data.updatedAt, // Keep as Timestamp if not used directly, or convert
+            // Transform specific fields
             date: (data.date as Timestamp).toDate(),
             paymentDueDate: data.paymentDueDate ? (data.paymentDueDate as Timestamp).toDate() : null,
-            lucro_bruto: data.lucro_bruto || 0,
-          } as Sale;
+            lucro_bruto: data.lucro_bruto || 0, // Ensure lucro_bruto is a number
+          } as CashClosingSale; 
         });
 
         setDailySales(salesData);
@@ -96,7 +119,7 @@ export default function CashClosingPage() {
         toast({
           variant: "destructive",
           title: "Erro ao buscar vendas do dia",
-          description: "Não foi possível carregar os dados para o fechamento de caixa.",
+          description: "Não foi possível carregar os dados para o fechamento de caixa. Verifique o console para mais detalhes ou se um índice do Firestore é necessário.",
         });
         setDailySales([]);
         setSummary(initialSummary);
@@ -109,20 +132,21 @@ export default function CashClosingPage() {
   }, [toast, currentDate, currentUser]);
 
 
-  const calculateSummary = (sales: Sale[]) => {
+  const calculateSummary = (sales: CashClosingSale[]) => {
     const newSummary: DailySummary = { ...initialSummary, salesByPaymentMethod: {} };
     sales.forEach(sale => {
+      // The query already filters for "Paid" status, but double-checking here is harmless.
       if (sale.status === "Paid") { 
         newSummary.totalSalesValue += sale.value;
         newSummary.salesCount++;
-        newSummary.totalGrossProfit += sale.lucro_bruto || 0;
+        newSummary.totalGrossProfit += sale.lucro_bruto; // Already a number
         const method = sale.paymentMethod || "Não especificado";
         if (!newSummary.salesByPaymentMethod[method]) {
           newSummary.salesByPaymentMethod[method] = { count: 0, value: 0, profit: 0 };
         }
         newSummary.salesByPaymentMethod[method].count++;
         newSummary.salesByPaymentMethod[method].value += sale.value;
-        newSummary.salesByPaymentMethod[method].profit += sale.lucro_bruto || 0;
+        newSummary.salesByPaymentMethod[method].profit += sale.lucro_bruto;
       }
     });
     newSummary.averageTicket = newSummary.salesCount > 0 ? newSummary.totalSalesValue / newSummary.salesCount : 0;
@@ -145,6 +169,8 @@ export default function CashClosingPage() {
     );
   }
   
+  // This block handles UI for non-dev, non-logged-in users.
+  // The useEffect above now prevents fetch if !currentUser, so this UI will show.
   if (!currentUser && process.env.NODE_ENV !== 'development') {
      return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -153,6 +179,17 @@ export default function CashClosingPage() {
       </div>
     );
   }
+  // If in dev mode and still no currentUser after loading, it implies an issue or an unauthenticated test case.
+  // The fetch would have been aborted. Show a message or allow dev to proceed with empty data.
+   if (!currentUser && process.env.NODE_ENV === 'development' && dailySales.length === 0 && summary.salesCount === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
+        <p className="text-muted-foreground">Modo de desenvolvimento: Nenhum usuário logado e nenhum dado de venda carregado.</p>
+        <p className="text-xs text-muted-foreground mt-2">A busca por vendas foi abortada por falta de usuário.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div>
@@ -212,7 +249,7 @@ export default function CashClosingPage() {
           <CardDescription>Lista de todas as vendas pagas realizadas hoje.</CardDescription>
         </CardHeader>
         <CardContent>
-          {dailySales.filter(sale => sale.status === "Paid").length > 0 ? (
+          {dailySales.filter(sale => sale.status === "Paid").length > 0 ? ( // Ensure we are iterating over already filtered sales if needed
             <Table>
               <TableHeader>
                 <TableRow>
@@ -225,12 +262,12 @@ export default function CashClosingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dailySales.filter(sale => sale.status === "Paid").map((sale) => (
+                {dailySales.map((sale) => ( // No need to filter by status again if query does it
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
                     <TableCell>{format(sale.date, "HH:mm:ss")}</TableCell>
                     <TableCell>{formatCurrency(sale.value)}</TableCell>
-                    <TableCell>{formatCurrency(sale.lucro_bruto || 0)}</TableCell>
+                    <TableCell>{formatCurrency(sale.lucro_bruto)}</TableCell>
                     <TableCell>{sale.paymentMethod}</TableCell>
                     <TableCell className="max-w-[200px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>
                   </TableRow>
@@ -265,5 +302,4 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon }) => {
     </Card>
   );
 };
-
     
