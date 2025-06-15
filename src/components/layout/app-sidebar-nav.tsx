@@ -24,15 +24,16 @@ import {
   LogOut,
   UserCog,
   Bell,
-  Flame, // Changed from custom SVG to Flame icon
+  Flame, 
   Loader2, 
-  ClipboardList, // Added for Cash Closing
+  ClipboardList, 
+  CalendarDays, // Added for Cash Closing History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context"; 
 
 const CSGASLogo = () => (
-  <Flame className="h-9 w-9 text-primary" /> // Replaced custom SVG with Flame icon
+  <Flame className="h-9 w-9 text-primary" /> 
 );
 
 
@@ -42,7 +43,8 @@ const navItems = [
   { href: "/sales", label: "Vendas", icon: ShoppingCart },
   { href: "/defaults", label: "Inadimplência", icon: CreditCard },
   { href: "/stock", label: "Estoque", icon: Archive },
-  { href: "/cash-closing", label: "Fechamento de Caixa", icon: ClipboardList }, // New item
+  { href: "/cash-closing", label: "Fechamento de Caixa", icon: ClipboardList },
+  { href: "/cash-closing-history", label: "Histórico de Caixa", icon: CalendarDays }, // New item
   { href: "/notifications", label: "Notificações", icon: Bell },
   { href: "/users", label: "Usuários", icon: UserCog },
 ];
