@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Printer, DollarSign, ShoppingCart, BarChart2 } from "lucide-react";
-import { format, startOfDay, endOfDay, subHours } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -47,8 +47,6 @@ const initialSummary: DailySummary = {
   salesByPaymentMethod: {},
 };
 
-const CUSTO_BOTIJAO = 94.00; // Definindo o custo aqui também para consistência no mock
-
 export default function CashClosingPage() {
   const [dailySales, setDailySales] = useState<Sale[]>([]);
   const [summary, setSummary] = useState<DailySummary>(initialSummary);
@@ -58,110 +56,40 @@ export default function CashClosingPage() {
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
-    if (!currentUser && process.env.NODE_ENV !== 'development') { 
-      setIsLoading(false);
-      return;
-    }
-
     const fetchDailySales = async () => {
       setIsLoading(true);
       try {
-        const today = new Date();
-        const mockSalesData: Sale[] = [
-          {
-            id: "mock1",
-            customerId: "cust123",
-            customerName: "João Silva",
-            value: 55.75,
-            paymentMethod: "Pix",
-            date: Timestamp.fromDate(subHours(today, 2)), 
-            status: "Paid",
-            gasCanistersQuantity: 1,
-            observations: "Entrega rápida.",
-            subtractFromStock: true,
-            createdAt: Timestamp.fromDate(subHours(today, 2)),
-            lucro_bruto: 55.75 - (CUSTO_BOTIJAO * 1),
-          },
-          {
-            id: "mock2",
-            customerName: "Consumidor Final",
-            value: 110.00,
-            paymentMethod: "Dinheiro",
-            date: Timestamp.fromDate(subHours(today, 1)), 
-            status: "Paid",
-            gasCanistersQuantity: 1,
-            observations: "",
-            subtractFromStock: true,
-            createdAt: Timestamp.fromDate(subHours(today, 1)),
-            lucro_bruto: 110.00 - (CUSTO_BOTIJAO * 1),
-          },
-          {
-            id: "mock3",
-            customerId: "cust456",
-            customerName: "Maria Oliveira",
-            value: 75.50,
-            paymentMethod: "Cartão de Crédito",
-            date: Timestamp.fromDate(subHours(today, 3)), 
-            status: "Paid",
-            gasCanistersQuantity: 1,
-            observations: "Cliente pediu troco para R$100.",
-            subtractFromStock: true,
-            createdAt: Timestamp.fromDate(subHours(today, 3)),
-            lucro_bruto: 75.50 - (CUSTO_BOTIJAO * 1),
-          },
-           {
-            id: "mock4",
-            customerName: "Consumidor Final",
-            value: 30.00,
-            paymentMethod: "Pix",
-            date: Timestamp.fromDate(subHours(today, 0.5)), 
-            status: "Paid",
-            gasCanistersQuantity: 0, 
-            observations: "Apenas mangueira",
-            subtractFromStock: false,
-            createdAt: Timestamp.fromDate(subHours(today, 0.5)),
-            lucro_bruto: 0,
-          },
-          {
-            id: "mock5",
-            customerId: "cust789",
-            customerName: "Carlos Souza",
-            value: 105.00,
-            paymentMethod: "Talão de luz",
-            date: Timestamp.fromDate(subHours(today, 4)), 
-            status: "Paid", 
-            paymentDueDate: Timestamp.fromDate(today),
-            gasCanistersQuantity: 1,
-            observations: "Pago no ato.",
-            subtractFromStock: true,
-            createdAt: Timestamp.fromDate(subHours(today, 4)),
-            lucro_bruto: 105.00 - (CUSTO_BOTIJAO * 1),
-          },
-           {
-            id: "mock6", 
-            customerId: "cust101",
-            customerName: "Ana Pereira",
-            value: 110.00,
-            paymentMethod: "Pix",
-            date: Timestamp.fromDate(subHours(today, 1)),
-            status: "Pending",
-            paymentDueDate: Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000)), 
-            gasCanistersQuantity: 1,
-            observations: "Pagamento agendado.",
-            subtractFromStock: true,
-            createdAt: Timestamp.fromDate(subHours(today, 1)),
-            lucro_bruto: 110.00 - (CUSTO_BOTIJAO * 1), // Lucro é calculado mesmo se pendente
-          },
-        ];
-        
-        const salesDataToProcess = mockSalesData.map(sale => ({
-          ...sale,
-          date: (sale.date as Timestamp).toDate(),
-          paymentDueDate: sale.paymentDueDate ? (sale.paymentDueDate as Timestamp).toDate() : null,
-        })) as unknown as Sale[]; 
+        if (!currentUser && process.env.NODE_ENV !== 'development') { 
+          setIsLoading(false);
+          return;
+        }
 
-        setDailySales(salesDataToProcess.filter(s => s.status === "Paid"));
-        calculateSummary(salesDataToProcess.filter(s => s.status === "Paid"));
+        const today = new Date();
+        const startOfToday = startOfDay(today);
+        const endOfToday = endOfDay(today);
+
+        const salesQuery = query(
+          collection(db, "sales"),
+          where("date", ">=", Timestamp.fromDate(startOfToday)),
+          where("date", "<=", Timestamp.fromDate(endOfToday)),
+          where("status", "==", "Paid"), 
+          orderBy("date", "asc")
+        );
+
+        const querySnapshot = await getDocs(salesQuery);
+        const salesData = querySnapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            ...data,
+            date: (data.date as Timestamp).toDate(),
+            paymentDueDate: data.paymentDueDate ? (data.paymentDueDate as Timestamp).toDate() : null,
+            lucro_bruto: data.lucro_bruto || 0,
+          } as Sale;
+        });
+
+        setDailySales(salesData);
+        calculateSummary(salesData);
         
       } catch (error) {
         console.error("Error fetching daily sales: ", error);
@@ -337,3 +265,5 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon }) => {
     </Card>
   );
 };
+
+    
