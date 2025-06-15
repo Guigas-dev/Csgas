@@ -63,6 +63,7 @@ interface KpiCardProps {
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
   const shouldFormatCurrency = typeof value === 'number' &&
     (title.toLowerCase().includes("vendas totais") ||
+     title.toLowerCase().includes("lucro bruto") || // Added for gross profit
      title.toLowerCase().includes("ticket médio") ||
      title.toLowerCase().includes("vendas pendentes") ||
      title.toLowerCase().includes("preço"));
@@ -109,6 +110,7 @@ export default function DashboardPage() {
   const [isEditingPrices, setIsEditingPrices] = useState(false);
 
   const [totalSalesMonth, setTotalSalesMonth] = useState<number | null>(null);
+  const [totalGrossProfitMonth, setTotalGrossProfitMonth] = useState<number | null>(null);
   const [paidSalesMonthCount, setPaidSalesMonthCount] = useState<number | null>(null);
   const [averageTicketMonth, setAverageTicketMonth] = useState<number | null>(null);
   const [newSalesTodayCount, setNewSalesTodayCount] = useState<number | null>(null);
@@ -203,7 +205,7 @@ export default function DashboardPage() {
             id: doc.id,
             ...data,
             date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-          } as Sale; // Sale type here will include lucro_bruto if it exists
+          } as Sale; 
         });
 
         setRecentSales(salesData.slice(0, 4));
@@ -213,6 +215,7 @@ export default function DashboardPage() {
         const lastDayOfMonth = endOfMonth(now);
 
         let currentMonthSalesValue = 0;
+        let currentMonthGrossProfit = 0;
         let currentMonthPaidSalesCount = 0;
         let currentMonthSalesCount = 0;
         let todaySalesCount = 0;
@@ -225,6 +228,7 @@ export default function DashboardPage() {
           
           if (isWithinInterval(saleDate, { start: firstDayOfMonth, end: lastDayOfMonth })) {
             currentMonthSalesValue += sale.value;
+            currentMonthGrossProfit += sale.lucro_bruto || 0;
             currentMonthSalesCount++;
             if (sale.status === "Paid") {
               currentMonthPaidSalesCount++;
@@ -247,6 +251,7 @@ export default function DashboardPage() {
 
 
         setTotalSalesMonth(currentMonthSalesValue);
+        setTotalGrossProfitMonth(currentMonthGrossProfit);
         setPaidSalesMonthCount(currentMonthPaidSalesCount);
         setNewSalesTodayCount(todaySalesCount);
         setAverageTicketMonth(currentMonthSalesCount > 0 ? currentMonthSalesValue / currentMonthSalesCount : 0);
@@ -326,12 +331,19 @@ export default function DashboardPage() {
     <div className="container mx-auto">
       <PageHeader title="Dashboard" description="Visão geral do seu negócio." />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         <KpiCard
           title="Vendas Totais (Mês)"
           value={totalSalesMonth}
           icon={<DollarSign className="h-5 w-5 text-foreground" />}
           valueColor="text-foreground"
+          isLoading={isLoadingSalesKpi}
+        />
+        <KpiCard
+          title="Lucro Bruto (Mês)"
+          value={totalGrossProfitMonth}
+          icon={<DollarSign className="h-5 w-5 text-success" />}
+          valueColor="text-success"
           isLoading={isLoadingSalesKpi}
         />
         <KpiCard
