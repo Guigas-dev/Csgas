@@ -83,6 +83,8 @@ const saleStatuses = [
 ];
 
 const ITEMS_PER_PAGE = 10;
+const CUSTO_BOTIJAO = 94.00;
+
 
 interface SalesFilterCriteria {
   customerName: string;
@@ -192,6 +194,7 @@ export default function SalesPage() {
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
           paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
           createdAt: data.createdAt,
+          lucro_bruto: data.lucro_bruto, // Ensure lucro_bruto is fetched
         } as Sale;
       });
       setAllSalesCache(salesData);
@@ -249,7 +252,6 @@ export default function SalesPage() {
       if (editingSale) {
         setSaleMode(editingSale.customerId ? 'customer' : 'quick');
         const customer = customers.find(c => c.id === editingSale.customerId);
-        // Ensure existing payment method is valid for the current sale mode
         if (!currentAvailablePaymentMethods.includes(editingSale.paymentMethod)) {
           defaultPaymentMethod = currentAvailablePaymentMethods[0] || '';
         } else {
@@ -317,7 +319,6 @@ export default function SalesPage() {
 
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
-    // saleMode will be set in the useEffect for isFormOpen
     setIsFormOpen(true);
   };
 
@@ -383,7 +384,8 @@ export default function SalesPage() {
         payloadCustomerName = formData.customerName?.trim() || "Consumidor Final";
     }
     
-    const salePayloadForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date' | 'paymentDueDate'> & { date: Timestamp, paymentDueDate: Timestamp | null, createdAt?: any, updatedAt?: any } = {
+    // Prepare base sale payload for Firestore
+    const saleDataForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date' | 'paymentDueDate' | 'lucro_bruto'> & { date: Timestamp, paymentDueDate: Timestamp | null } = {
       customerId: payloadCustomerId,
       customerName: payloadCustomerName,
       value: parseFloat(String(formData.value)) || 0,
@@ -396,6 +398,18 @@ export default function SalesPage() {
       subtractFromStock: formData.subtractFromStock,
     };
 
+    // Calculate lucro_bruto
+    let lucroBrutoCalculado = 0;
+    if (saleDataForFirestore.gasCanistersQuantity > 0) {
+        lucroBrutoCalculado = saleDataForFirestore.value - (CUSTO_BOTIJAO * saleDataForFirestore.gasCanistersQuantity);
+    }
+
+    const finalSalePayload = {
+      ...saleDataForFirestore,
+      lucro_bruto: lucroBrutoCalculado,
+    };
+
+
     try {
       const batch = writeBatch(db);
       let saleIdForOperations: string;
@@ -404,25 +418,25 @@ export default function SalesPage() {
       if (editingSale) {
         saleDocRef = doc(db, 'sales', editingSale.id);
         batch.update(saleDocRef, {
-          ...salePayloadForFirestore,
+          ...finalSalePayload,
           updatedAt: serverTimestamp(),
         });
         saleIdForOperations = editingSale.id;
       } else {
         saleDocRef = doc(collection(db, 'sales')); 
         batch.set(saleDocRef, {
-          ...salePayloadForFirestore,
+          ...finalSalePayload,
           createdAt: serverTimestamp(),
         });
         saleIdForOperations = saleDocRef.id;
       }
 
-      if (formData.subtractFromStock && saleIdForOperations && salePayloadForFirestore.gasCanistersQuantity > 0) {
+      if (formData.subtractFromStock && saleIdForOperations && finalSalePayload.gasCanistersQuantity > 0) {
         const stockMovementRef = doc(collection(db, 'stockMovements'));
         const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> & { createdAt: any } = {
           type: 'OUTPUT',
           origin: 'Venda',
-          quantity: salePayloadForFirestore.gasCanistersQuantity,
+          quantity: finalSalePayload.gasCanistersQuantity,
           notes: `Saída automática por venda ID: ${saleIdForOperations}`,
           relatedSaleId: saleIdForOperations,
           createdAt: serverTimestamp()
@@ -434,12 +448,12 @@ export default function SalesPage() {
       const defaultsSnapshot = await getDocs(defaultsQuery);
       const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
 
-      if (salePayloadForFirestore.status === 'Pending' && salePayloadForFirestore.paymentDueDate) {
+      if (finalSalePayload.status === 'Pending' && finalSalePayload.paymentDueDate) {
         const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any} = {
-            customerId: salePayloadForFirestore.customerId,
-            customerName: salePayloadForFirestore.customerName,
-            value: salePayloadForFirestore.value,
-            dueDate: salePayloadForFirestore.paymentDueDate,
+            customerId: finalSalePayload.customerId,
+            customerName: finalSalePayload.customerName,
+            value: finalSalePayload.value,
+            dueDate: finalSalePayload.paymentDueDate,
             paymentStatus: 'Pending', 
             saleId: saleIdForOperations,
         };
@@ -450,7 +464,7 @@ export default function SalesPage() {
             batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
         }
       } else if (existingDefaultDoc) { 
-        if (salePayloadForFirestore.status === 'Paid') {
+        if (finalSalePayload.status === 'Paid') {
           batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
         } else {
           batch.delete(existingDefaultDoc.ref);
@@ -586,6 +600,7 @@ export default function SalesPage() {
                   <TableRow>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Valor</TableHead>
+                    <TableHead>Lucro Bruto</TableHead>
                     <TableHead>Pagamento</TableHead>
                     <TableHead>Data Venda</TableHead>
                     <TableHead>Status</TableHead>
@@ -600,6 +615,7 @@ export default function SalesPage() {
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
                       <TableCell>{formatCurrency(sale.value)}</TableCell>
+                      <TableCell>{sale.lucro_bruto !== undefined ? formatCurrency(sale.lucro_bruto) : "N/A"}</TableCell>
                       <TableCell>{sale.paymentMethod}</TableCell>
                       <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
                       <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>

@@ -27,7 +27,6 @@ import { collection, getDocs, query, orderBy, Timestamp, where, limit } from "fi
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
 import type { Sale } from "./sales/actions";
-// import type { Customer } from "./customers/actions"; // Customer type not directly used in this file for KPIs
 
 
 const salesBarChartConfig = {
@@ -204,7 +203,7 @@ export default function DashboardPage() {
             id: doc.id,
             ...data,
             date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-          } as Sale;
+          } as Sale; // Sale type here will include lucro_bruto if it exists
         });
 
         setRecentSales(salesData.slice(0, 4));
@@ -520,7 +519,6 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
-                {/* Placeholder de tendência removido */}
                 <div></div> 
                 {lastUpdatedTime ? (
                   <p className="text-xs text-muted-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
@@ -726,5 +724,3 @@ export default function DashboardPage() {
   );
 }
 
-
-    

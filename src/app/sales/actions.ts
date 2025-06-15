@@ -24,6 +24,7 @@ export interface Sale extends Omit<SaleFormData, 'date' | 'paymentDueDate'> {
   paymentDueDate?: Timestamp | null; // Armazenado como Timestamp no Firestore
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  lucro_bruto?: number; // Lucro bruto da venda de botijões
 }
 
 export async function revalidateSalesRelatedPages(): Promise<{ success: boolean }> {
@@ -32,9 +33,11 @@ export async function revalidateSalesRelatedPages(): Promise<{ success: boolean 
     revalidatePath('/stock'); // Sales can affect stock
     revalidatePath('/'); // Dashboard might show sales or stock info
     revalidatePath('/defaults'); // Sales pendentes podem afetar inadimplência
+    revalidatePath('/cash-closing'); // Sales affect cash closing
     return { success: true };
   } catch (error) {
     console.error('Error revalidating sales related pages:', error);
     return { success: false };
   }
 }
+

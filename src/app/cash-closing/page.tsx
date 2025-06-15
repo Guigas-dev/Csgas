@@ -33,8 +33,9 @@ interface DailySummary {
   totalSalesValue: number;
   salesCount: number;
   averageTicket: number;
+  totalGrossProfit: number; 
   salesByPaymentMethod: {
-    [key: string]: { count: number; value: number };
+    [key: string]: { count: number; value: number; profit: number };
   };
 }
 
@@ -42,8 +43,11 @@ const initialSummary: DailySummary = {
   totalSalesValue: 0,
   salesCount: 0,
   averageTicket: 0,
+  totalGrossProfit: 0,
   salesByPaymentMethod: {},
 };
+
+const CUSTO_BOTIJAO = 94.00; // Definindo o custo aqui também para consistência no mock
 
 export default function CashClosingPage() {
   const [dailySales, setDailySales] = useState<Sale[]>([]);
@@ -54,7 +58,7 @@ export default function CashClosingPage() {
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
-    if (!currentUser && process.env.NODE_ENV !== 'development') { // Allow mock data in dev without user
+    if (!currentUser && process.env.NODE_ENV !== 'development') { 
       setIsLoading(false);
       return;
     }
@@ -62,8 +66,6 @@ export default function CashClosingPage() {
     const fetchDailySales = async () => {
       setIsLoading(true);
       try {
-        // --- INÍCIO DOS DADOS FICTÍCIOS ---
-        // Comente esta seção e descomente a busca no Firestore abaixo para usar dados reais.
         const today = new Date();
         const mockSalesData: Sale[] = [
           {
@@ -72,24 +74,26 @@ export default function CashClosingPage() {
             customerName: "João Silva",
             value: 55.75,
             paymentMethod: "Pix",
-            date: Timestamp.fromDate(subHours(today, 2)), // Hoje, 2 horas atrás
+            date: Timestamp.fromDate(subHours(today, 2)), 
             status: "Paid",
             gasCanistersQuantity: 1,
             observations: "Entrega rápida.",
             subtractFromStock: true,
             createdAt: Timestamp.fromDate(subHours(today, 2)),
+            lucro_bruto: 55.75 - (CUSTO_BOTIJAO * 1),
           },
           {
             id: "mock2",
             customerName: "Consumidor Final",
             value: 110.00,
             paymentMethod: "Dinheiro",
-            date: Timestamp.fromDate(subHours(today, 1)), // Hoje, 1 hora atrás
+            date: Timestamp.fromDate(subHours(today, 1)), 
             status: "Paid",
             gasCanistersQuantity: 1,
             observations: "",
             subtractFromStock: true,
             createdAt: Timestamp.fromDate(subHours(today, 1)),
+            lucro_bruto: 110.00 - (CUSTO_BOTIJAO * 1),
           },
           {
             id: "mock3",
@@ -97,24 +101,26 @@ export default function CashClosingPage() {
             customerName: "Maria Oliveira",
             value: 75.50,
             paymentMethod: "Cartão de Crédito",
-            date: Timestamp.fromDate(subHours(today, 3)), // Hoje, 3 horas atrás
+            date: Timestamp.fromDate(subHours(today, 3)), 
             status: "Paid",
             gasCanistersQuantity: 1,
             observations: "Cliente pediu troco para R$100.",
             subtractFromStock: true,
             createdAt: Timestamp.fromDate(subHours(today, 3)),
+            lucro_bruto: 75.50 - (CUSTO_BOTIJAO * 1),
           },
            {
             id: "mock4",
             customerName: "Consumidor Final",
             value: 30.00,
             paymentMethod: "Pix",
-            date: Timestamp.fromDate(subHours(today, 0.5)), // Hoje, 30 minutos atrás
+            date: Timestamp.fromDate(subHours(today, 0.5)), 
             status: "Paid",
-            gasCanistersQuantity: 0, // Ex: venda de um acessório
+            gasCanistersQuantity: 0, 
             observations: "Apenas mangueira",
             subtractFromStock: false,
             createdAt: Timestamp.fromDate(subHours(today, 0.5)),
+            lucro_bruto: 0,
           },
           {
             id: "mock5",
@@ -122,27 +128,29 @@ export default function CashClosingPage() {
             customerName: "Carlos Souza",
             value: 105.00,
             paymentMethod: "Talão de luz",
-            date: Timestamp.fromDate(subHours(today, 4)), // Hoje, 4 horas atrás
-            status: "Paid", // Assumindo que foi pago no dia para constar no fechamento
+            date: Timestamp.fromDate(subHours(today, 4)), 
+            status: "Paid", 
             paymentDueDate: Timestamp.fromDate(today),
             gasCanistersQuantity: 1,
             observations: "Pago no ato.",
             subtractFromStock: true,
             createdAt: Timestamp.fromDate(subHours(today, 4)),
+            lucro_bruto: 105.00 - (CUSTO_BOTIJAO * 1),
           },
            {
-            id: "mock6", // Venda pendente, não deve aparecer no resumo de pagos
+            id: "mock6", 
             customerId: "cust101",
             customerName: "Ana Pereira",
             value: 110.00,
             paymentMethod: "Pix",
             date: Timestamp.fromDate(subHours(today, 1)),
             status: "Pending",
-            paymentDueDate: Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000)), // Vence amanhã
+            paymentDueDate: Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000)), 
             gasCanistersQuantity: 1,
             observations: "Pagamento agendado.",
             subtractFromStock: true,
             createdAt: Timestamp.fromDate(subHours(today, 1)),
+            lucro_bruto: 110.00 - (CUSTO_BOTIJAO * 1), // Lucro é calculado mesmo se pendente
           },
         ];
         
@@ -150,41 +158,11 @@ export default function CashClosingPage() {
           ...sale,
           date: (sale.date as Timestamp).toDate(),
           paymentDueDate: sale.paymentDueDate ? (sale.paymentDueDate as Timestamp).toDate() : null,
-        })) as unknown as Sale[]; // Cast to Sale[] after converting Timestamps
+        })) as unknown as Sale[]; 
 
         setDailySales(salesDataToProcess.filter(s => s.status === "Paid"));
         calculateSummary(salesDataToProcess.filter(s => s.status === "Paid"));
-        // --- FIM DOS DADOS FICTÍCIOS ---
-
-        /*
-        // --- INÍCIO DA BUSCA NO FIRESTORE (DADOS REAIS) ---
-        // Descomente esta seção e comente a seção de dados fictícios acima para usar dados reais.
-        const todayStart = startOfDay(currentDate);
-        const todayEnd = endOfDay(currentDate);
-
-        const salesQuery = query(
-          collection(db, "sales"),
-          where("date", ">=", Timestamp.fromDate(todayStart)),
-          where("date", "<=", Timestamp.fromDate(todayEnd)),
-          where("status", "==", "Paid"), // Only paid sales for cash closing
-          orderBy("date", "desc")
-        );
-
-        const querySnapshot = await getDocs(salesQuery);
-        const salesData = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            ...data,
-            date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-            paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
-          } as Sale;
-        });
-        setDailySales(salesData);
-        calculateSummary(salesData);
-        // --- FIM DA BUSCA NO FIRESTORE ---
-        */
-
+        
       } catch (error) {
         console.error("Error fetching daily sales: ", error);
         toast({
@@ -200,23 +178,23 @@ export default function CashClosingPage() {
     };
 
     fetchDailySales();
-  // Removed currentUser from dependencies for mock data to work without login in dev
   }, [toast, currentDate, currentUser]);
 
 
   const calculateSummary = (sales: Sale[]) => {
     const newSummary: DailySummary = { ...initialSummary, salesByPaymentMethod: {} };
     sales.forEach(sale => {
-      // Ensure we are only processing sales that are marked as Paid for the summary
       if (sale.status === "Paid") { 
         newSummary.totalSalesValue += sale.value;
         newSummary.salesCount++;
+        newSummary.totalGrossProfit += sale.lucro_bruto || 0;
         const method = sale.paymentMethod || "Não especificado";
         if (!newSummary.salesByPaymentMethod[method]) {
-          newSummary.salesByPaymentMethod[method] = { count: 0, value: 0 };
+          newSummary.salesByPaymentMethod[method] = { count: 0, value: 0, profit: 0 };
         }
         newSummary.salesByPaymentMethod[method].count++;
         newSummary.salesByPaymentMethod[method].value += sale.value;
+        newSummary.salesByPaymentMethod[method].profit += sale.lucro_bruto || 0;
       }
     });
     newSummary.averageTicket = newSummary.salesCount > 0 ? newSummary.totalSalesValue / newSummary.salesCount : 0;
@@ -260,16 +238,17 @@ export default function CashClosingPage() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <KpiCard title="Total de Vendas Pagas (Dia)" value={formatCurrency(summary.totalSalesValue)} icon={<DollarSign className="h-5 w-5 text-foreground" />} />
         <KpiCard title="Número de Vendas Pagas (Dia)" value={summary.salesCount.toString()} icon={<ShoppingCart className="h-5 w-5 text-foreground" />} />
         <KpiCard title="Ticket Médio (Dia)" value={formatCurrency(summary.averageTicket)} icon={<BarChart2 className="h-5 w-5 text-foreground" />} />
+        <KpiCard title="Lucro Bruto Total (Dia)" value={formatCurrency(summary.totalGrossProfit)} icon={<DollarSign className="h-5 w-5 text-success" />} />
       </div>
 
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Vendas por Forma de Pagamento (Dia)</CardTitle>
-          <CardDescription>Valores totais e quantidade de vendas pagas por cada método.</CardDescription>
+          <CardDescription>Valores totais, lucro e quantidade de vendas pagas por cada método.</CardDescription>
         </CardHeader>
         <CardContent>
           {Object.keys(summary.salesByPaymentMethod).length > 0 ? (
@@ -279,6 +258,7 @@ export default function CashClosingPage() {
                   <TableHead>Forma de Pagamento</TableHead>
                   <TableHead className="text-right">Qtd. Vendas</TableHead>
                   <TableHead className="text-right">Valor Total</TableHead>
+                  <TableHead className="text-right">Lucro Bruto</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -287,6 +267,7 @@ export default function CashClosingPage() {
                     <TableCell className="font-medium">{method}</TableCell>
                     <TableCell className="text-right">{data.count}</TableCell>
                     <TableCell className="text-right">{formatCurrency(data.value)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(data.profit)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -310,6 +291,7 @@ export default function CashClosingPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Horário</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Lucro Bruto</TableHead>
                   <TableHead>Forma de Pagamento</TableHead>
                   <TableHead>Observações</TableHead>
                 </TableRow>
@@ -320,6 +302,7 @@ export default function CashClosingPage() {
                     <TableCell className="font-medium">{sale.customerName || "Consumidor Final"}</TableCell>
                     <TableCell>{format(sale.date, "HH:mm:ss")}</TableCell>
                     <TableCell>{formatCurrency(sale.value)}</TableCell>
+                    <TableCell>{formatCurrency(sale.lucro_bruto || 0)}</TableCell>
                     <TableCell>{sale.paymentMethod}</TableCell>
                     <TableCell className="max-w-[200px] truncate" title={sale.observations}>{sale.observations || "-"}</TableCell>
                   </TableRow>
@@ -354,6 +337,3 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon }) => {
     </Card>
   );
 };
-
-
-    
