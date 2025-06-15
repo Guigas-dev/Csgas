@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -48,7 +48,6 @@ const ITEMS_PER_PAGE = 10;
 
 export default function CustomersPage() {
   const [allCustomersCache, setAllCustomersCache] = useState<Customer[]>([]);
-  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -56,6 +55,7 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const initialFormData: CustomerFormData = useMemo(() => ({ 
     name: '', 
@@ -83,7 +83,6 @@ export default function CustomersPage() {
         } as Customer;
       });
       setAllCustomersCache(customersData);
-      setCurrentPage(1); // Reset to first page on new fetch
     } catch (error) {
       console.error("Error fetching customers: ", error);
       toast({
@@ -100,20 +99,40 @@ export default function CustomersPage() {
     fetchCustomers();
   }, [toast]); 
 
+  const filteredCustomers = useMemo(() => {
+    const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+    if (!lowercasedSearchTerm) {
+      return allCustomersCache;
+    }
+    return allCustomersCache.filter(customer =>
+      customer.name.toLowerCase().includes(lowercasedSearchTerm) ||
+      customer.cpf.toLowerCase().includes(lowercasedSearchTerm) ||
+      (customer.phone && customer.phone.toLowerCase().includes(lowercasedSearchTerm)) ||
+      (customer.street && customer.street.toLowerCase().includes(lowercasedSearchTerm)) ||
+      (customer.neighborhood && customer.neighborhood.toLowerCase().includes(lowercasedSearchTerm)) ||
+      (customer.referencePoint && customer.referencePoint.toLowerCase().includes(lowercasedSearchTerm))
+    );
+  }, [allCustomersCache, searchTerm]);
+
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, allCustomersCache]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+
+  const paginatedCustomers = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    setPaginatedCustomers(allCustomersCache.slice(startIndex, endIndex));
-  }, [allCustomersCache, currentPage]);
+    return filteredCustomers.slice(startIndex, endIndex);
+  }, [filteredCustomers, currentPage]);
 
-  const totalPages = Math.ceil(allCustomersCache.length / ITEMS_PER_PAGE);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
   };
 
   const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages || 1)); // Ensure totalPages is at least 1
   };
 
   const handleAddCustomer = () => {
@@ -240,7 +259,18 @@ export default function CustomersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Clientes</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <CardTitle>Lista de Clientes</CardTitle>
+            <div className="relative w-full sm:w-auto sm:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, CPF, telefone, endereço..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-input"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -248,6 +278,10 @@ export default function CustomersPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="ml-2 text-muted-foreground">Carregando clientes...</p>
             </div>
+          ) : allCustomersCache.length === 0 ? (
+             <p className="text-center text-muted-foreground py-10">Nenhum cliente cadastrado.</p>
+          ) : filteredCustomers.length === 0 ? (
+             <p className="text-center text-muted-foreground py-10">Nenhum cliente encontrado para "{searchTerm}".</p>
           ) : (
             <>
               <Table>
@@ -281,13 +315,8 @@ export default function CustomersPage() {
                   ))}
                 </TableBody>
               </Table>
-              {!isLoading && paginatedCustomers.length === 0 && allCustomersCache.length > 0 && (
-                 <p className="text-center text-muted-foreground py-4">Nenhum cliente encontrado para esta página.</p>
-              )}
-              {!isLoading && allCustomersCache.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">Nenhum cliente cadastrado.</p>
-              )}
-              {!isLoading && totalPages > 0 && (
+              
+              {totalPages > 0 && (
                 <div className="flex items-center justify-end space-x-2 py-4">
                   <Button
                     variant="outline"
@@ -376,5 +405,4 @@ export default function CustomersPage() {
     </div>
   );
 }
-
     
