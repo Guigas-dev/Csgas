@@ -37,7 +37,7 @@ const salesBarChartConfig = {
 };
 
 const maxStock = 100;
-const LOW_STOCK_THRESHOLD = 20; 
+const LOW_STOCK_THRESHOLD = 20;
 
 const stockPieChartConfig = {
   value: { label: "Unidades" },
@@ -63,7 +63,7 @@ interface KpiCardProps {
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
   const shouldFormatCurrency = typeof value === 'number' &&
     (title.toLowerCase().includes("vendas totais") ||
-     title.toLowerCase().includes("lucro bruto") || 
+     title.toLowerCase().includes("lucro bruto") ||
      title.toLowerCase().includes("ticket médio") ||
      title.toLowerCase().includes("vendas pendentes") ||
      title.toLowerCase().includes("preço"));
@@ -92,6 +92,12 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueCol
   );
 };
 
+const FIXED_CURRENT_PRICE = 94.00;
+const defaultGasPrices = {
+  current: FIXED_CURRENT_PRICE,
+  cash: 120.00,
+  card: 125.00,
+};
 
 export default function DashboardPage() {
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null);
@@ -100,12 +106,6 @@ export default function DashboardPage() {
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
   const { toast } = useToast();
 
-  const FIXED_CURRENT_PRICE = 94.00;
-  const defaultGasPrices = {
-    current: FIXED_CURRENT_PRICE,
-    cash: 120.00, 
-    card: 125.00, 
-  };
   const [gasPrices, setGasPrices] = useState(defaultGasPrices);
   const [editedPrices, setEditedPrices] = useState(defaultGasPrices);
   const [isEditingPrices, setIsEditingPrices] = useState(false);
@@ -127,7 +127,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLastUpdatedTime(new Date());
-    let activeGasPrices = { ...defaultGasPrices }; 
+    let activeGasPrices = { ...defaultGasPrices };
 
     const storedPricesJSON = localStorage.getItem('gasPrices');
     if (storedPricesJSON) {
@@ -139,22 +139,22 @@ export default function DashboardPage() {
           typeof parsedPrices.card === 'number'
         ) {
           activeGasPrices = {
-            current: FIXED_CURRENT_PRICE, 
+            current: FIXED_CURRENT_PRICE,
             cash: parsedPrices.cash,
             card: parsedPrices.card,
           };
         } else {
-          localStorage.removeItem('gasPrices'); 
+          localStorage.removeItem('gasPrices');
         }
       } catch (error) {
         console.error("Failed to parse gas prices from localStorage:", error);
-        localStorage.removeItem('gasPrices'); 
+        localStorage.removeItem('gasPrices');
       }
     }
-    
+
     setGasPrices(activeGasPrices);
-    setEditedPrices(activeGasPrices); 
-  }, [FIXED_CURRENT_PRICE, defaultGasPrices]);
+    setEditedPrices(activeGasPrices);
+  }, []); // Changed dependency array to []
 
 
   useEffect(() => {
@@ -210,7 +210,7 @@ export default function DashboardPage() {
             id: doc.id,
             ...data,
             date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-          } as Sale; 
+          } as Sale;
         });
 
         setRecentSales(salesData.slice(0, 4));
@@ -230,7 +230,7 @@ export default function DashboardPage() {
 
         salesData.forEach(sale => {
           const saleDate = sale.date;
-          
+
           if (isWithinInterval(saleDate, { start: firstDayOfMonth, end: lastDayOfMonth })) {
             currentMonthSalesValue += sale.value;
             currentMonthGrossProfit += sale.lucro_bruto || 0;
@@ -242,7 +242,7 @@ export default function DashboardPage() {
             const weekNumber = getISOWeek(saleDate);
             const weekKey = `${currentYear}-W${weekNumber}`;
             if (!weeklySalesData[weekKey]) {
-              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0 }; 
+              weeklySalesData[weekKey] = { weekLabel: `Sem ${weekNumber}`, vendas: 0 };
             }
             weeklySalesData[weekKey].vendas += sale.value;
           }
@@ -250,7 +250,7 @@ export default function DashboardPage() {
             todaySalesCount++;
           }
         });
-        
+
         const chartDataFormatted = Object.values(weeklySalesData).sort((a,b) => a.weekLabel.localeCompare(b.weekLabel));
         setDynamicSalesChartData(chartDataFormatted.length > 0 ? chartDataFormatted : [{ weekLabel: format(now, "MMM dd", {locale: ptBR}), vendas: 0 }]);
 
@@ -288,7 +288,7 @@ export default function DashboardPage() {
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
-  }, []); // Changed dependency from [toast] to []
+  }, []);
 
   const handleEditPrices = () => {
     setEditedPrices(prev => ({ ...prev, cash: gasPrices.cash, card: gasPrices.card }));
@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
   const handleSavePrices = () => {
     const pricesToSave = {
-      current: FIXED_CURRENT_PRICE, 
+      current: FIXED_CURRENT_PRICE,
       cash: editedPrices.cash,
       card: editedPrices.card,
     };
@@ -320,7 +320,7 @@ export default function DashboardPage() {
   };
 
   const handleCancelEditPrices = () => {
-    setEditedPrices(gasPrices); 
+    setEditedPrices(gasPrices);
     setIsEditingPrices(false);
   };
 
@@ -333,7 +333,7 @@ export default function DashboardPage() {
     { name: "Em Estoque", value: currentStockForChart, fill: "hsl(var(--chart-1))" },
     { name: "Capacidade Livre", value: Math.max(0, maxStock - currentStockForChart), fill: "hsl(var(--border))" }
   ];
-  
+
   const totalDueFromDefaults = defaultingCustomers.reduce((sum, item) => sum + item.value, 0);
   const isStockLow = currentStockLevel !== null && currentStockLevel < LOW_STOCK_THRESHOLD;
 
@@ -368,7 +368,7 @@ export default function DashboardPage() {
           value={totalDueFromDefaults}
           subText={isLoadingDefaults ? "Carregando..." : `${defaultingCustomers.length} Pendentes`}
           icon={<AlertTriangle className="h-5 w-5 text-foreground" />}
-          valueColor="text-foreground" 
+          valueColor="text-foreground"
           subTextColor="text-destructive"
           isLoading={isLoadingDefaults}
         />
@@ -379,10 +379,10 @@ export default function DashboardPage() {
           isLoading={isLoadingStock}
           valueColor={isLoadingStock ? "text-foreground" : (isStockLow ? "text-yellow-500" : "text-foreground")}
           subText={
-            isLoadingStock 
+            isLoadingStock
               ? undefined
-              : currentStockLevel !== null 
-                ? `${currentStockLevel}/${maxStock} unidades ${isStockLow ? " - Atenção!" : ""}` 
+              : currentStockLevel !== null
+                ? `${currentStockLevel}/${maxStock} unidades ${isStockLow ? " - Atenção!" : ""}`
                 : `0/${maxStock} unidades`
           }
           subTextColor={isLoadingStock ? "text-muted-foreground" : (isStockLow ? "text-yellow-600" : "text-muted-foreground")}
@@ -402,7 +402,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="pt-2">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div> 
+            <div>
               <div className="flex items-center space-x-2 mb-1">
                 <Flame className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Atual</span>
@@ -411,15 +411,15 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-0.5">Botijão P13</p>
             </div>
 
-            <div> 
+            <div>
               <div className="flex items-center space-x-2 mb-1">
                 <Banknote className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">À Vista</span>
               </div>
               {isEditingPrices ? (
-                <Input 
-                  type="number" 
-                  value={editedPrices.cash} 
+                <Input
+                  type="number"
+                  value={editedPrices.cash}
                   onChange={(e) => handlePriceInputChange('cash', e.target.value)}
                   className="bg-input text-foreground text-xl font-bold p-2 h-auto"
                 />
@@ -427,24 +427,24 @@ export default function DashboardPage() {
                 <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.cash)}</p>
               )}
                <p className="text-xs text-success mt-0.5">
-                {isEditingPrices && gasPrices.current > editedPrices.cash 
+                {isEditingPrices && gasPrices.current > editedPrices.cash
                   ? `Desconto de ${formatCurrency(gasPrices.current - editedPrices.cash)}`
                   : !isEditingPrices && gasPrices.current > gasPrices.cash
                   ? `Desconto de ${formatCurrency(gasPrices.current - gasPrices.cash)}`
-                  : " " 
+                  : " "
                 }
               </p>
             </div>
 
-            <div> 
+            <div>
               <div className="flex items-center space-x-2 mb-1">
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Cartão</span>
               </div>
               {isEditingPrices ? (
-                <Input 
-                  type="number" 
-                  value={editedPrices.card} 
+                <Input
+                  type="number"
+                  value={editedPrices.card}
                   onChange={(e) => handlePriceInputChange('card', e.target.value)}
                   className="bg-input text-foreground text-xl font-bold p-2 h-auto"
                 />
@@ -464,7 +464,7 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card className="shadow-sm bg-card">
@@ -532,7 +532,7 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
-                <div></div> 
+                <div></div>
                 {lastUpdatedTime ? (
                   <p className="text-xs text-muted-foreground">Atualizado: {format(lastUpdatedTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                 ) : (
