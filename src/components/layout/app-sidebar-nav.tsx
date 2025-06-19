@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react"; 
+import React, { useEffect, useState, useMemo } from "react"; 
 import {
   SidebarHeader,
   SidebarContent,
@@ -87,10 +87,17 @@ export function AppSidebarNav() {
         if (isActiveParent) {
           initialOpenState[item.label] = true;
         }
+         // Ensure non-active parent submenus are marked as closed in initialOpenState
+        if (initialOpenState[item.label] === undefined) {
+            initialOpenState[item.label] = false;
+        }
       }
     });
-    setOpenSubMenus(initialOpenState);
-  }, [pathname]);
+     // Only update if the new state is different from the current one
+    if (JSON.stringify(openSubMenus) !== JSON.stringify(initialOpenState)) {
+        setOpenSubMenus(initialOpenState);
+    }
+  }, [pathname, openSubMenus]);
 
 
   useEffect(() => {
@@ -135,6 +142,13 @@ export function AppSidebarNav() {
             {navItems.map((item) => {
               const isActiveParent = item.subItems?.some(sub => pathname.startsWith(sub.href)) || (item.href && pathname.startsWith(item.href));
               
+              // Memoize tooltip configuration
+              const tooltipConfig = useMemo(() => ({
+                children: item.label,
+                side: "right" as const,
+                className: "bg-popover text-popover-foreground"
+              }), [item.label]);
+
               return (
                 <SidebarMenuItem key={item.label}>
                   {item.subItems ? (
@@ -149,7 +163,7 @@ export function AppSidebarNav() {
                         )}
                         isActive={isActiveParent}
                         data-state={openSubMenus[item.label] ? "open" : "closed"}
-                        tooltip={{ children: item.label, side: "right", className:"bg-popover text-popover-foreground" }}
+                        tooltip={tooltipConfig}
                       >
                         <div className="flex items-center gap-2">
                           <item.icon className="h-5 w-5" />
@@ -194,7 +208,7 @@ export function AppSidebarNav() {
                             : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                         isActive={isActiveParent}
-                        tooltip={{ children: item.label, side: "right", className:"bg-popover text-popover-foreground" }}
+                        tooltip={tooltipConfig}
                       >
                         <item.icon className="h-5 w-5" />
                         <span>{item.label}</span>
