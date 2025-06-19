@@ -79,25 +79,40 @@ export function AppSidebarNav() {
   const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Initialize open state for submenus based on current path
     const initialOpenState: Record<string, boolean> = {};
+    let hasChanged = false;
     navItems.forEach(item => {
       if (item.subItems) {
         const isActiveParent = item.subItems.some(sub => pathname.startsWith(sub.href));
-        if (isActiveParent) {
-          initialOpenState[item.label] = true;
+        if (initialOpenState[item.label] !== isActiveParent) {
+          initialOpenState[item.label] = isActiveParent;
+          if (isActiveParent) hasChanged = true; // Only mark changed if opening
         }
-         // Ensure non-active parent submenus are marked as closed in initialOpenState
+         // Ensure non-active parent submenus are marked as closed if not already
         if (initialOpenState[item.label] === undefined) {
             initialOpenState[item.label] = false;
         }
       }
     });
-     // Only update if the new state is different from the current one
-    if (JSON.stringify(openSubMenus) !== JSON.stringify(initialOpenState)) {
+    
+    // Only update if the new state for actively opened submenus differs
+    // or if the initial state is different from the current openSubMenus
+    let stateNeedsUpdate = false;
+    for (const key in initialOpenState) {
+        if (openSubMenus[key] !== initialOpenState[key]) {
+            stateNeedsUpdate = true;
+            break;
+        }
+    }
+    if(Object.keys(openSubMenus).length !== Object.keys(initialOpenState).length && !stateNeedsUpdate){
+        stateNeedsUpdate = true;
+    }
+
+
+    if (stateNeedsUpdate) {
         setOpenSubMenus(initialOpenState);
     }
-  }, [pathname, openSubMenus]);
+  }, [pathname]); // Removed openSubMenus from dependency array to avoid potential loops
 
 
   useEffect(() => {
@@ -142,12 +157,11 @@ export function AppSidebarNav() {
             {navItems.map((item) => {
               const isActiveParent = item.subItems?.some(sub => pathname.startsWith(sub.href)) || (item.href && pathname.startsWith(item.href));
               
-              // Memoize tooltip configuration
-              const tooltipConfig = useMemo(() => ({
+              const tooltipConfig = {
                 children: item.label,
                 side: "right" as const,
                 className: "bg-popover text-popover-foreground"
-              }), [item.label]);
+              };
 
               return (
                 <SidebarMenuItem key={item.label}>
