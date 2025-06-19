@@ -103,8 +103,8 @@ export default function DashboardPage() {
   const FIXED_CURRENT_PRICE = 94.00;
   const defaultGasPrices = {
     current: FIXED_CURRENT_PRICE,
-    cash: 120.00, // From image
-    card: 125.00, // From image
+    cash: 120.00, 
+    card: 125.00, 
   };
   const [gasPrices, setGasPrices] = useState(defaultGasPrices);
   const [editedPrices, setEditedPrices] = useState(defaultGasPrices);
@@ -139,21 +139,18 @@ export default function DashboardPage() {
           typeof parsedPrices.card === 'number'
         ) {
           activeGasPrices = {
-            current: FIXED_CURRENT_PRICE, // Always use fixed current price
+            current: FIXED_CURRENT_PRICE, 
             cash: parsedPrices.cash,
             card: parsedPrices.card,
           };
         } else {
-          // Invalid stored data, use defaults (current is already fixed in defaultGasPrices)
-          localStorage.removeItem('gasPrices'); // Clean up invalid data
+          localStorage.removeItem('gasPrices'); 
         }
       } catch (error) {
         console.error("Failed to parse gas prices from localStorage:", error);
-        // On error, use defaults (current is already fixed)
-        localStorage.removeItem('gasPrices'); // Clean up invalid data
+        localStorage.removeItem('gasPrices'); 
       }
     }
-    // If no storedPricesJSON, activeGasPrices remains defaultGasPrices (with fixed current price)
     
     setGasPrices(activeGasPrices);
     setEditedPrices(activeGasPrices); 
@@ -291,17 +288,16 @@ export default function DashboardPage() {
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
-  }, [toast]);
+  }, []); // Changed dependency from [toast] to []
 
   const handleEditPrices = () => {
-    // editedPrices.current is already FIXED_CURRENT_PRICE due to initialization logic
     setEditedPrices(prev => ({ ...prev, cash: gasPrices.cash, card: gasPrices.card }));
     setIsEditingPrices(true);
   };
 
   const handleSavePrices = () => {
     const pricesToSave = {
-      current: FIXED_CURRENT_PRICE, // Current price is always fixed
+      current: FIXED_CURRENT_PRICE, 
       cash: editedPrices.cash,
       card: editedPrices.card,
     };
@@ -324,7 +320,7 @@ export default function DashboardPage() {
   };
 
   const handleCancelEditPrices = () => {
-    setEditedPrices(gasPrices); // Reset to current gasPrices (which has fixed current price)
+    setEditedPrices(gasPrices); 
     setIsEditingPrices(false);
   };
 
@@ -406,17 +402,16 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="pt-2">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div> {/* "Atual" price section */}
+            <div> 
               <div className="flex items-center space-x-2 mb-1">
                 <Flame className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Atual</span>
               </div>
-              {/* Always display as text, not input */}
               <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Botijão P13</p>
             </div>
 
-            <div> {/* "À Vista" price section */}
+            <div> 
               <div className="flex items-center space-x-2 mb-1">
                 <Banknote className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">À Vista</span>
@@ -441,7 +436,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div> {/* "Cartão" price section */}
+            <div> 
               <div className="flex items-center space-x-2 mb-1">
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Cartão</span>
