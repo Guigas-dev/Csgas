@@ -63,7 +63,7 @@ interface KpiCardProps {
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueColor = "text-foreground", subTextColor = "text-muted-foreground", isLoading = false }) => {
   const shouldFormatCurrency = typeof value === 'number' &&
     (title.toLowerCase().includes("vendas totais") ||
-     title.toLowerCase().includes("lucro bruto") || // Added for gross profit
+     title.toLowerCase().includes("lucro bruto") || 
      title.toLowerCase().includes("ticket médio") ||
      title.toLowerCase().includes("vendas pendentes") ||
      title.toLowerCase().includes("preço"));
@@ -100,10 +100,11 @@ export default function DashboardPage() {
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
   const { toast } = useToast();
 
+  const FIXED_CURRENT_PRICE = 94.00;
   const defaultGasPrices = {
-    current: 115.00,
-    cash: 110.00,
-    card: 118.00,
+    current: FIXED_CURRENT_PRICE,
+    cash: 120.00, // From image
+    card: 125.00, // From image
   };
   const [gasPrices, setGasPrices] = useState(defaultGasPrices);
   const [editedPrices, setEditedPrices] = useState(defaultGasPrices);
@@ -134,22 +135,29 @@ export default function DashboardPage() {
         const parsedPrices = JSON.parse(storedPricesJSON);
         if (
           parsedPrices &&
-          typeof parsedPrices.current === 'number' &&
           typeof parsedPrices.cash === 'number' &&
           typeof parsedPrices.card === 'number'
         ) {
-          activeGasPrices = parsedPrices; 
+          activeGasPrices = {
+            current: FIXED_CURRENT_PRICE, // Always use fixed current price
+            cash: parsedPrices.cash,
+            card: parsedPrices.card,
+          };
         } else {
-          localStorage.removeItem('gasPrices');
+          // Invalid stored data, use defaults (current is already fixed in defaultGasPrices)
+          localStorage.removeItem('gasPrices'); // Clean up invalid data
         }
       } catch (error) {
         console.error("Failed to parse gas prices from localStorage:", error);
-        localStorage.removeItem('gasPrices'); 
+        // On error, use defaults (current is already fixed)
+        localStorage.removeItem('gasPrices'); // Clean up invalid data
       }
     }
+    // If no storedPricesJSON, activeGasPrices remains defaultGasPrices (with fixed current price)
+    
     setGasPrices(activeGasPrices);
     setEditedPrices(activeGasPrices); 
-  }, []);
+  }, [FIXED_CURRENT_PRICE, defaultGasPrices]);
 
 
   useEffect(() => {
@@ -286,14 +294,20 @@ export default function DashboardPage() {
   }, [toast]);
 
   const handleEditPrices = () => {
-    setEditedPrices(gasPrices); 
+    // editedPrices.current is already FIXED_CURRENT_PRICE due to initialization logic
+    setEditedPrices(prev => ({ ...prev, cash: gasPrices.cash, card: gasPrices.card }));
     setIsEditingPrices(true);
   };
 
   const handleSavePrices = () => {
-    setGasPrices(editedPrices);
+    const pricesToSave = {
+      current: FIXED_CURRENT_PRICE, // Current price is always fixed
+      cash: editedPrices.cash,
+      card: editedPrices.card,
+    };
+    setGasPrices(pricesToSave);
     try {
-      localStorage.setItem('gasPrices', JSON.stringify(editedPrices));
+      localStorage.setItem('gasPrices', JSON.stringify(pricesToSave));
       toast({
         title: "Preços Atualizados!",
         description: "Os preços do gás foram salvos com sucesso no seu navegador.",
@@ -310,11 +324,11 @@ export default function DashboardPage() {
   };
 
   const handleCancelEditPrices = () => {
-    setEditedPrices(gasPrices); 
+    setEditedPrices(gasPrices); // Reset to current gasPrices (which has fixed current price)
     setIsEditingPrices(false);
   };
 
-  const handlePriceInputChange = (key: keyof typeof gasPrices, value: string) => {
+  const handlePriceInputChange = (key: keyof Omit<typeof gasPrices, 'current'>, value: string) => {
     setEditedPrices(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
   };
 
@@ -392,25 +406,17 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="pt-2">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
+            <div> {/* "Atual" price section */}
               <div className="flex items-center space-x-2 mb-1">
                 <Flame className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Atual</span>
               </div>
-              {isEditingPrices ? (
-                <Input 
-                  type="number" 
-                  value={editedPrices.current} 
-                  onChange={(e) => handlePriceInputChange('current', e.target.value)} 
-                  className="bg-input text-foreground text-xl font-bold p-2 h-auto"
-                />
-              ) : (
-                <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
-              )}
+              {/* Always display as text, not input */}
+              <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Botijão P13</p>
             </div>
 
-            <div>
+            <div> {/* "À Vista" price section */}
               <div className="flex items-center space-x-2 mb-1">
                 <Banknote className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">À Vista</span>
@@ -426,8 +432,8 @@ export default function DashboardPage() {
                 <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.cash)}</p>
               )}
                <p className="text-xs text-success mt-0.5">
-                {isEditingPrices && editedPrices.current > editedPrices.cash 
-                  ? `Desconto de ${formatCurrency(editedPrices.current - editedPrices.cash)}`
+                {isEditingPrices && gasPrices.current > editedPrices.cash 
+                  ? `Desconto de ${formatCurrency(gasPrices.current - editedPrices.cash)}`
                   : !isEditingPrices && gasPrices.current > gasPrices.cash
                   ? `Desconto de ${formatCurrency(gasPrices.current - gasPrices.cash)}`
                   : " " 
@@ -435,7 +441,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div>
+            <div> {/* "Cartão" price section */}
               <div className="flex items-center space-x-2 mb-1">
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Cartão</span>
