@@ -31,6 +31,8 @@ import {
   isSameMonth,
   isSameYear,
   parseISO,
+  startOfDay, // Adicionado
+  endOfDay,   // Adicionado
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -350,3 +352,4 @@ export default function CashClosingHistoryPage() {
     </div>
   );
 }
+
