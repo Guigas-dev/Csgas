@@ -3,10 +3,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from "@/lib/firebase/config";
-import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
 import type { Timestamp } from 'firebase/firestore';
 
-// Interface permanece para tipagem
 export interface StockMovementFormData {
   type: 'INPUT' | 'OUTPUT';
   origin: string; 
@@ -17,31 +16,36 @@ export interface StockMovementFormData {
 
 export interface StockMovementEntry extends StockMovementFormData {
   id: string;
-  createdAt: Timestamp; // Firestore Timestamp
+  createdAt: Timestamp;
 }
 
-export async function revalidateStockRelatedPages(): Promise<{ success: boolean }> {
+export async function addStockMovement(data: StockMovementFormData): Promise<{ success: boolean; error?: string }> {
   try {
+    await addDoc(collection(db, 'stockMovements'), {
+      ...data,
+      quantity: Number(data.quantity) || 0,
+      createdAt: serverTimestamp(),
+    });
     revalidatePath('/stock');
-    revalidatePath('/'); // Dashboard might show stock info
+    revalidatePath('/');
     return { success: true };
-  } catch (error) {
-    console.error('Error revalidating stock related pages:', error);
-    return { success: false };
+  } catch (e: unknown) {
+    console.error('Error adding stock movement:', e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return { success: false, error: errorMessage };
   }
 }
 
 export async function updateStockMovement(id: string, data: Omit<StockMovementFormData, 'type' | 'relatedSaleId'>): Promise<{ success: boolean; error?: string }> {
   try {
     const movementRef = doc(db, "stockMovements", id);
-    // Type and relatedSaleId should not be editable for manual entries after creation to maintain integrity.
-    // Origin might be editable for manual entries, quantity and notes definitely are.
     await updateDoc(movementRef, {
       ...data,
-      quantity: Number(data.quantity) || 0, // Ensure quantity is a number
+      quantity: Number(data.quantity) || 0,
       updatedAt: serverTimestamp() 
     });
-    await revalidateStockRelatedPages();
+    revalidatePath('/stock');
+    revalidatePath('/');
     return { success: true };
   } catch (e: unknown) {
     console.error('Error updating stock movement:', e);
@@ -54,7 +58,8 @@ export async function deleteStockMovement(id: string): Promise<{ success: boolea
   try {
     const movementRef = doc(db, "stockMovements", id);
     await deleteDoc(movementRef);
-    await revalidateStockRelatedPages();
+    revalidatePath('/stock');
+    revalidatePath('/');
     return { success: true };
   } catch (e: unknown) {
     console.error('Error deleting stock movement:', e);

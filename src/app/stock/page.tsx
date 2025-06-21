@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, MinusCircle, Loader2, ChevronLeft, ChevronRight, Edit, Trash2 } from "lucide-react";
@@ -41,12 +41,10 @@ import {
   getDocs, 
   query, 
   orderBy, 
-  addDoc, 
   Timestamp,
-  serverTimestamp 
 } from "firebase/firestore";
 import type { StockMovementEntry, StockMovementFormData } from "./actions";
-import { revalidateStockRelatedPages, updateStockMovement, deleteStockMovement } from "./actions";
+import { addStockMovement, updateStockMovement, deleteStockMovement } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
 
 const movementOrigins = ["Manual", "Ajuste", "Perda"]; // "Venda" is handled automatically
@@ -72,7 +70,7 @@ export default function StockPage() {
   }), []);
   const [formData, setFormData] = useState<StockMovementFormData>(initialFormData);
 
-  const fetchStockMovements = async () => {
+  const fetchStockMovements = useCallback(async () => {
     setIsLoading(true);
     try {
       const q = query(collection(db, "stockMovements"), orderBy("createdAt", "desc"));
@@ -97,11 +95,11 @@ export default function StockPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
   
   useEffect(() => {
     fetchStockMovements();
-  }, [toast]);
+  }, [fetchStockMovements]);
 
   useEffect(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -131,7 +129,7 @@ export default function StockPage() {
       }
       setEditingMovement(movementToEdit);
       setFormData({
-        type: movementToEdit.type, // Type is not editable for existing entries
+        type: movementToEdit.type,
         origin: movementToEdit.origin,
         quantity: movementToEdit.quantity,
         notes: movementToEdit.notes || '',
@@ -148,48 +146,38 @@ export default function StockPage() {
     e.preventDefault();
     if (!currentUser) {
       toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para esta ação." });
-      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
 
-    const payload: StockMovementFormData = {
-      ...formData,
-      quantity: parseInt(String(formData.quantity)) || 0,
-    };
-
-    try {
-      if (editingMovement) {
-        // For updates, we only send editable fields. Type and relatedSaleId are not editable.
-        const updatePayload = { 
-          origin: payload.origin, 
-          quantity: payload.quantity, 
-          notes: payload.notes 
-        };
-        const result = await updateStockMovement(editingMovement.id, updatePayload);
-        if (result.success) {
-          toast({ title: "Movimentação Atualizada!", description: "A movimentação de estoque foi atualizada." });
-        } else {
-          throw new Error(result.error || "Falha ao atualizar movimentação.");
-        }
-      } else {
-        await addDoc(collection(db, 'stockMovements'), {
-          ...payload, // This includes type and relatedSaleId (which would be undefined for new manual entries)
-          createdAt: serverTimestamp(),
-        });
-        toast({ title: "Movimentação Registrada!", description: "A movimentação de estoque foi adicionada." });
-      }
-      setIsFormOpen(false);
-      setEditingMovement(null);
-      await revalidateStockRelatedPages();
-      fetchStockMovements();
-    } catch (error: unknown) {
-      console.error('Error saving stock movement:', error);
-      let errorMessage = 'Falha ao salvar movimentação de estoque.';
-      if (error instanceof Error) errorMessage = error.message;
-      else if (typeof error === 'string') errorMessage = error;
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: errorMessage });
+    let result;
+    if (editingMovement) {
+      const updatePayload = { 
+        origin: formData.origin, 
+        quantity: formData.quantity, 
+        notes: formData.notes 
+      };
+      result = await updateStockMovement(editingMovement.id, updatePayload);
+    } else {
+      result = await addStockMovement(formData);
     }
+
+    if(result.success) {
+        toast({ 
+            title: editingMovement ? "Movimentação Atualizada!" : "Movimentação Registrada!", 
+            description: "A movimentação de estoque foi salva com sucesso." 
+        });
+        setIsFormOpen(false);
+        setEditingMovement(null);
+        await fetchStockMovements();
+    } else {
+        toast({ 
+            variant: "destructive", 
+            title: "Erro ao Salvar", 
+            description: result.error 
+        });
+    }
+
     setIsSubmitting(false);
   };
 
@@ -205,21 +193,12 @@ export default function StockPage() {
     if (!confirm("Tem certeza que deseja excluir esta movimentação de estoque?")) return;
 
     setIsSubmitting(true);
-    try {
-      const result = await deleteStockMovement(movementId);
-      if (result.success) {
-        toast({ title: "Movimentação Excluída!", description: "O registro foi removido com sucesso." });
-        await revalidateStockRelatedPages();
-        fetchStockMovements();
-      } else {
-        throw new Error(result.error || "Falha ao excluir movimentação.");
-      }
-    } catch (error: unknown) {
-      console.error('Error deleting stock movement:', error);
-      let errorMessage = 'Falha ao excluir movimentação de estoque.';
-      if (error instanceof Error) errorMessage = error.message;
-      else if (typeof error === 'string') errorMessage = error;
-      toast({ variant: "destructive", title: "Erro ao Excluir", description: errorMessage });
+    const result = await deleteStockMovement(movementId);
+    if (result.success) {
+      toast({ title: "Movimentação Excluída!", description: "O registro foi removido com sucesso." });
+      await fetchStockMovements();
+    } else {
+      toast({ variant: "destructive", title: "Erro ao Excluir", description: result.error });
     }
     setIsSubmitting(false);
   };
@@ -372,7 +351,6 @@ export default function StockPage() {
           </SheetHeader>
           <ScrollArea className="flex-grow">
             <form onSubmit={handleFormSubmit} id="stock-form" className="py-4 pr-6 space-y-4">
-              {/* Type is not editable directly here; it's set when opening the form */}
               <input type="hidden" value={formData.type} />
 
               <div className="space-y-1">
@@ -393,13 +371,12 @@ export default function StockPage() {
                 <Select 
                   value={formData.origin} 
                   onValueChange={val => setFormData({...formData, origin: val})} 
-                  disabled={isSubmitting || !!editingMovement?.relatedSaleId || formData.origin === 'Venda'} // Cannot change origin if it was a sale
+                  disabled={isSubmitting || !!editingMovement?.relatedSaleId || formData.origin === 'Venda'}
                 >
                   <SelectTrigger className="w-full bg-input text-foreground">
                     <SelectValue placeholder="Origem da movimentação" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* If editing a sale-generated movement, only show its origin (Venda), otherwise show manual origins */}
                     {(editingMovement?.relatedSaleId || formData.origin === 'Venda') ? (
                       <SelectItem value="Venda">Venda (Automática)</SelectItem>
                     ) : (

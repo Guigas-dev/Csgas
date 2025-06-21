@@ -32,16 +32,10 @@ import {
   collection, 
   getDocs, 
   query, 
-  orderBy, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp,
-  where 
+  orderBy,
 } from "firebase/firestore";
 import type { Customer, CustomerFormData } from "./actions";
-import { revalidateCustomersPage } from "./actions";
+import { addCustomer, updateCustomer, deleteCustomer } from "./actions";
 import { useAuth } from "@/contexts/auth-context";
 
 const ITEMS_PER_PAGE = 10;
@@ -97,7 +91,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [toast]); 
+  }, []); 
 
   const filteredCustomers = useMemo(() => {
     const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
@@ -163,18 +157,12 @@ export default function CustomersPage() {
     if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
 
     setIsSubmitting(true);
-    try {
-      const customerRef = doc(db, 'customers', id);
-      await deleteDoc(customerRef);
+    const result = await deleteCustomer(id);
+    if (result.success) {
       toast({ title: "Cliente excluído!", description: "O cliente foi removido com sucesso." });
-      await revalidateCustomersPage(); 
-      fetchCustomers(); 
-    } catch (e: unknown) {
-      console.error('Error deleting customer:', e);
-      let errorMessage = 'Falha ao excluir cliente.';
-      if (e instanceof Error) errorMessage = e.message;
-      else if (typeof e === 'string') errorMessage = e;
-      toast({ variant: "destructive", title: "Erro ao excluir", description: errorMessage });
+      await fetchCustomers();
+    } else {
+      toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
     }
     setIsSubmitting(false);
   };
@@ -183,63 +171,30 @@ export default function CustomersPage() {
     e.preventDefault();
     if (!currentUser) {
       toast({ variant: "destructive", title: "Não autenticado", description: "Faça login para salvar." });
-      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
     
-    try {
-      if (editingCustomer) {
-        if (formData.cpf !== editingCustomer.cpf) {
-          const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
-          const querySnapshot = await getDocs(q);
-          if (!querySnapshot.empty) {
-            const existingCustomerDoc = querySnapshot.docs.find(d => d.id !== editingCustomer.id);
-            if (existingCustomerDoc) {
-              toast({
-                variant: "destructive",
-                title: "Erro ao Atualizar Cliente",
-                description: "Já existe outro cliente cadastrado com este CPF.",
-              });
-              setIsSubmitting(false);
-              return;
-            }
-          }
-        }
-        const customerRef = doc(db, 'customers', editingCustomer.id);
-        await updateDoc(customerRef, {
-          ...formData,
-          updatedAt: serverTimestamp(), 
-        });
-        toast({ title: "Cliente atualizado!", description: "Os dados do cliente foram atualizados." });
-      } else {
-        const q = query(collection(db, "customers"), where("cpf", "==", formData.cpf));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          toast({
-            variant: "destructive",
-            title: "Erro ao Adicionar Cliente",
-            description: "Já existe um cliente cadastrado com este CPF.",
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        await addDoc(collection(db, 'customers'), {
-          ...formData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(), 
-        });
-        toast({ title: "Cliente adicionado!", description: "Novo cliente cadastrado com sucesso." });
-      }
+    let result;
+    if (editingCustomer) {
+      result = await updateCustomer(editingCustomer.id, formData);
+    } else {
+      result = await addCustomer(formData);
+    }
+
+    if (result.success) {
+      toast({ 
+        title: editingCustomer ? "Cliente atualizado!" : "Cliente adicionado!", 
+        description: `Os dados do cliente foram ${editingCustomer ? 'atualizados' : 'cadastrados'}.` 
+      });
       setIsFormOpen(false);
-      await revalidateCustomersPage(); 
-      fetchCustomers(); 
-    } catch (e: unknown) {
-      console.error('Error saving customer:', e);
-      let errorMessage = 'Falha ao salvar cliente.';
-       if (e instanceof Error) errorMessage = e.message;
-       else if (typeof e === 'string') errorMessage = e;
-      toast({ variant: "destructive", title: "Erro ao salvar", description: errorMessage });
+      await fetchCustomers();
+    } else {
+      toast({ 
+        variant: "destructive", 
+        title: editingCustomer ? "Erro ao Atualizar" : "Erro ao Adicionar", 
+        description: result.error 
+      });
     }
     setIsSubmitting(false);
   };

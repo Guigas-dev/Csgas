@@ -56,22 +56,12 @@ import {
   getDocs,
   query,
   orderBy,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
   Timestamp,
-  serverTimestamp,
-  writeBatch,
-  where,
-  limit
 } from "firebase/firestore";
 import type { Sale, SaleFormData } from "./actions";
-import { revalidateSalesRelatedPages } from "./actions";
+import { addOrUpdateSale, deleteSale } from "./actions";
 import type { Customer } from "../customers/actions";
-import type { StockMovementEntry } from "../stock/actions";
 import { useAuth } from "@/contexts/auth-context";
-import type { DefaultEntry } from "../defaults/actions";
 
 const basePaymentMethods = ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"];
 const customerSpecificPaymentMethod = "Talão de luz";
@@ -83,8 +73,6 @@ const saleStatuses = [
 ];
 
 const ITEMS_PER_PAGE = 10;
-const CUSTO_BOTIJAO = 94.00;
-
 
 interface SalesFilterCriteria {
   customerName: string;
@@ -194,7 +182,7 @@ export default function SalesPage() {
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
           paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
           createdAt: data.createdAt,
-          lucro_bruto: data.lucro_bruto, // Ensure lucro_bruto is fetched
+          lucro_bruto: data.lucro_bruto,
         } as Sale;
       });
       setAllSalesCache(salesData);
@@ -329,28 +317,12 @@ export default function SalesPage() {
     }
     if (!confirm("Tem certeza que deseja excluir esta venda? Esta ação também removerá a pendência associada, se houver.")) return;
     setIsSubmitting(true);
-    try {
-      const batch = writeBatch(db);
-      const saleRef = doc(db, 'sales', id);
-      batch.delete(saleRef);
-
-      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", id), limit(1));
-      const defaultsSnapshot = await getDocs(defaultsQuery);
-      if (!defaultsSnapshot.empty) {
-        const defaultDocRef = defaultsSnapshot.docs[0].ref;
-        batch.delete(defaultDocRef);
-      }
-      
-      await batch.commit();
+    const result = await deleteSale(id);
+    if(result.success) {
       toast({ title: "Venda Removida!", description: "O registro da venda e qualquer pendência associada foram removidos." });
-      await revalidateSalesRelatedPages();
-      fetchSales();
-    } catch (e: unknown) {
-      console.error('Error deleting sale and associated default:', e);
-      let errorMessage = 'Falha ao excluir venda.';
-      if (e instanceof Error) errorMessage = e.message;
-      else if (typeof e === 'string') errorMessage = e;
-      toast({ variant: "destructive", title: "Erro ao excluir", description: errorMessage });
+      await fetchSales();
+    } else {
+      toast({ variant: "destructive", title: "Erro ao excluir", description: result.error });
     }
     setIsSubmitting(false);
   };
@@ -364,131 +336,35 @@ export default function SalesPage() {
         title: "Usuário não autenticado",
         description: "Por favor, faça login para registrar uma venda.",
       });
-      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
     
-    const payloadCustomerId = saleMode === 'customer' ? formData.customerId : null;
-    let payloadCustomerName = ""; 
+    const customersForAction = customers.map(c => ({ id: c.id, name: c.name }));
 
-    if (saleMode === 'customer' && payloadCustomerId) { 
-      const selectedCust = customers.find(c => c.id === payloadCustomerId);
-      payloadCustomerName = selectedCust ? selectedCust.name : "Cliente Desconhecido";
-    } else if (saleMode === 'quick') {
-      payloadCustomerName = formData.customerName?.trim() || "Consumidor Final";
-    } else if (editingSale && editingSale.customerId) { 
-        const selectedCust = customers.find(c => c.id === editingSale.customerId);
-        payloadCustomerName = selectedCust ? selectedCust.name : "Cliente Desconhecido";
-    } else { 
-        payloadCustomerName = formData.customerName?.trim() || "Consumidor Final";
-    }
-    
-    // Prepare base sale payload for Firestore
-    const saleDataForFirestore: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'date' | 'paymentDueDate' | 'lucro_bruto'> & { date: Timestamp, paymentDueDate: Timestamp | null } = {
-      customerId: payloadCustomerId,
-      customerName: payloadCustomerName,
-      value: parseFloat(String(formData.value)) || 0,
-      paymentMethod: formData.paymentMethod,
-      date: Timestamp.fromDate(formData.date),
-      status: formData.status,
-      paymentDueDate: formData.status === 'Pending' && formData.paymentDueDate ? Timestamp.fromDate(formData.paymentDueDate) : null,
-      gasCanistersQuantity: parseInt(String(formData.gasCanistersQuantity)) || 0,
-      observations: formData.observations || '',
-      subtractFromStock: formData.subtractFromStock,
-    };
+    const result = await addOrUpdateSale(
+      formData,
+      customersForAction,
+      saleMode,
+      editingSale?.id
+    );
 
-    // Calculate lucro_bruto
-    let lucroBrutoCalculado = 0;
-    if (saleDataForFirestore.gasCanistersQuantity > 0) {
-        lucroBrutoCalculado = saleDataForFirestore.value - (CUSTO_BOTIJAO * saleDataForFirestore.gasCanistersQuantity);
-    }
-
-    const finalSalePayload = {
-      ...saleDataForFirestore,
-      lucro_bruto: lucroBrutoCalculado,
-    };
-
-
-    try {
-      const batch = writeBatch(db);
-      let saleIdForOperations: string;
-      let saleDocRef;
-
-      if (editingSale) {
-        saleDocRef = doc(db, 'sales', editingSale.id);
-        batch.update(saleDocRef, {
-          ...finalSalePayload,
-          updatedAt: serverTimestamp(),
-        });
-        saleIdForOperations = editingSale.id;
-      } else {
-        saleDocRef = doc(collection(db, 'sales')); 
-        batch.set(saleDocRef, {
-          ...finalSalePayload,
-          createdAt: serverTimestamp(),
-        });
-        saleIdForOperations = saleDocRef.id;
-      }
-
-      if (formData.subtractFromStock && saleIdForOperations && finalSalePayload.gasCanistersQuantity > 0) {
-        const stockMovementRef = doc(collection(db, 'stockMovements'));
-        const stockMovementPayload: Omit<StockMovementEntry, 'id' | 'createdAt'> & { createdAt: any } = {
-          type: 'OUTPUT',
-          origin: 'Venda',
-          quantity: finalSalePayload.gasCanistersQuantity,
-          notes: `Saída automática por venda ID: ${saleIdForOperations}`,
-          relatedSaleId: saleIdForOperations,
-          createdAt: serverTimestamp()
-        };
-        batch.set(stockMovementRef, stockMovementPayload);
-      }
-      
-      const defaultsQuery = query(collection(db, "defaults"), where("saleId", "==", saleIdForOperations), limit(1));
-      const defaultsSnapshot = await getDocs(defaultsQuery);
-      const existingDefaultDoc = defaultsSnapshot.docs.length > 0 ? defaultsSnapshot.docs[0] : null;
-
-      if (finalSalePayload.status === 'Pending' && finalSalePayload.paymentDueDate) {
-        const defaultPayload: Omit<DefaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'dueDate'> & { dueDate: Timestamp; createdAt?: any; updatedAt?: any} = {
-            customerId: finalSalePayload.customerId,
-            customerName: finalSalePayload.customerName,
-            value: finalSalePayload.value,
-            dueDate: finalSalePayload.paymentDueDate,
-            paymentStatus: 'Pending', 
-            saleId: saleIdForOperations,
-        };
-        if (existingDefaultDoc) {
-            batch.update(existingDefaultDoc.ref, {...defaultPayload, updatedAt: serverTimestamp()});
-        } else {
-            const newDefaultRef = doc(collection(db, 'defaults'));
-            batch.set(newDefaultRef, {...defaultPayload, createdAt: serverTimestamp()});
-        }
-      } else if (existingDefaultDoc) { 
-        if (finalSalePayload.status === 'Paid') {
-          batch.update(existingDefaultDoc.ref, { paymentStatus: 'Paid', updatedAt: serverTimestamp() });
-        } else {
-          batch.delete(existingDefaultDoc.ref);
-        }
-      }
-
-      await batch.commit();
-
+    if (result.success) {
       toast({ 
         title: editingSale ? "Venda Atualizada!" : "Venda Registrada!", 
         description: (editingSale ? "Os dados da venda" : "A nova venda") + 
                      " e quaisquer pendências/estoque associados foram atualizados." 
       });
-      
       setIsFormOpen(false);
-      await revalidateSalesRelatedPages(); 
-      fetchSales();
-    } catch (e: unknown) {
-      console.error('Error saving sale and/or related operations:', e);
-      let errorMessage = 'Falha ao salvar venda/movimentação de estoque/pendência.';
-       if (e instanceof Error) errorMessage = e.message;
-       else if (typeof e === 'string') errorMessage = e;
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: errorMessage });
+      await fetchSales();
+    } else {
+      toast({ 
+        variant: "destructive", 
+        title: "Erro ao Salvar", 
+        description: result.error 
+      });
     }
+    
     setIsSubmitting(false);
   };
 
@@ -1020,4 +896,3 @@ export default function SalesPage() {
     </div>
   );
 }
-

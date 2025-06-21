@@ -4,51 +4,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to get a user's role from the app_users collection.
+    // Helper Functions
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
+    
     function getUserData(userId) {
+      // Access the user's document in the 'app_users' collection
       return get(/databases/$(database)/documents/app_users/$(userId)).data;
     }
 
-    // By default, deny all reads and writes.
+    function isRequestingUserAdmin() {
+      // Check the access level of the user making the request
+      return isUserAuthenticated() && getUserData(request.auth.uid).accessLevel == 'Admin';
+    }
+
+    // Default deny all access
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Rules for the 'customers' collection
-    match /customers/{customerId} {
-      // Any authenticated user can create, read, update, and delete customers.
-      allow read, write: if request.auth != null;
-    }
-
-    // Rules for the 'sales' collection
-    match /sales/{saleId} {
-       // Any authenticated user can create, read, update, and delete sales.
-      allow read, write: if request.auth != null;
-    }
-
-    // Rules for the 'defaults' (pending payments) collection
-    match /defaults/{defaultId} {
-       // Any authenticated user can manage default entries.
-      allow read, write: if request.auth != null;
+    // Customers, Sales, Defaults, Stock Movements:
+    // Any authenticated user can create, read, update, delete.
+    match /{collection}/{docId}
+      where collection in ['customers', 'sales', 'defaults', 'stockMovements'] {
+      allow read, write: if isUserAuthenticated();
     }
     
-    // Rules for the 'stockMovements' collection
-    match /stockMovements/{movementId} {
-       // Any authenticated user can manage stock movements.
-      allow read, write: if request.auth != null;
-    }
-
-    // Rules for the 'app_users' collection (contains user roles)
+    // Application Users:
+    // Any authenticated user can read the list of users.
+    // Only an Admin can create, update, or delete user documents.
     match /app_users/{userId} {
-      // Any authenticated user can read their own user data.
-      allow get: if request.auth != null && request.auth.uid == userId;
-
-      // Any authenticated user can read the list of users (for display).
-      allow list: if request.auth != null;
-
-      // Only an Admin can create, update, or delete user records.
-      // We check the role of the user MAKING the request.
-      allow create, update, delete: if request.auth != null && getUserData(request.auth.uid).accessLevel == "Admin";
+      allow read: if isUserAuthenticated();
+      allow write: if isRequestingUserAdmin();
     }
   }
 }
