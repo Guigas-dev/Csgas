@@ -1,42 +1,12 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper Functions
-    function isUserAuthenticated() {
-      return request.auth != null;
-    }
     
-    function getUserData(userId) {
-      // Access the user's document in the 'app_users' collection
-      return get(/databases/$(database)/documents/app_users/$(userId)).data;
-    }
-
-    function isRequestingUserAdmin() {
-      // Check the access level of the user making the request
-      return isUserAuthenticated() && getUserData(request.auth.uid).accessLevel == 'Admin';
-    }
-
-    // Default deny all access
+    // Allow any authenticated user to read and write to any document.
+    // This is a permissive rule set.
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Customers, Sales, Defaults, Stock Movements:
-    // Any authenticated user can create, read, update, delete.
-    match /{collection}/{docId}
-      where collection in ['customers', 'sales', 'defaults', 'stockMovements'] {
-      allow read, write: if isUserAuthenticated();
-    }
-    
-    // Application Users:
-    // Any authenticated user can read the list of users.
-    // Only an Admin can create, update, or delete user documents.
-    match /app_users/{userId} {
-      allow read: if isUserAuthenticated();
-      allow write: if isRequestingUserAdmin();
+      allow read, write: if request.auth != null;
     }
   }
 }
