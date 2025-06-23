@@ -37,10 +37,16 @@ export async function fetchAppUsers(): Promise<AppUser[]> {
   try {
     const q = query(collection(db, USERS_COLLECTION), orderBy('name', 'asc'));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<AppUser, 'id'>),
-    }));
+    // Explicitly map fields to ensure type safety during build
+    return querySnapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name || '',
+        email: data.email || '',
+        accessLevel: data.accessLevel === "Admin" ? "Admin" : "Usuário",
+      } as AppUser;
+    });
   } catch (error) {
     console.error('Error fetching app users:', error);
     return [];
