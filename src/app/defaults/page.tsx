@@ -90,9 +90,14 @@ export default function DefaultsPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          ...data,
+          customerId: data.customerId,
+          customerName: data.customerName,
+          saleId: data.saleId,
+          value: data.value,
+          paymentStatus: data.paymentStatus,
           dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
           createdAt: data.createdAt,
+          updatedAt: data.updatedAt
         } as DefaultEntry;
       });
       setAllDefaultsCache(defaultsData);

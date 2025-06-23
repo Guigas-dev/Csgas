@@ -79,7 +79,11 @@ export default function StockPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          ...data,
+          type: data.type,
+          origin: data.origin,
+          quantity: data.quantity,
+          notes: data.notes,
+          relatedSaleId: data.relatedSaleId,
           createdAt: data.createdAt as Timestamp, 
         } as StockMovementEntry;
       });

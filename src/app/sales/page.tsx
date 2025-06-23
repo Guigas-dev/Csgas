@@ -58,7 +58,7 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import type { Sale, SaleFormData } from "./actions";
+import type { Sale as FirestoreSale, SaleFormData } from "./actions";
 import { addOrUpdateSale, deleteSale } from "./actions";
 import type { Customer } from "../customers/actions";
 import { useAuth } from "@/contexts/auth-context";
@@ -74,6 +74,14 @@ const saleStatuses = [
 
 const ITEMS_PER_PAGE = 10;
 
+// Local type for page state, converting Timestamps to Dates for UI components
+type SaleForPage = Omit<FirestoreSale, 'date' | 'paymentDueDate' | 'createdAt' | 'updatedAt'> & {
+  date: Date;
+  paymentDueDate: Date | null;
+  createdAt?: Timestamp;
+};
+
+
 interface SalesFilterCriteria {
   customerName: string;
   status: string; 
@@ -83,15 +91,15 @@ interface SalesFilterCriteria {
 }
 
 export default function SalesPage() {
-  const [allSalesCache, setAllSalesCache] = useState<Sale[]>([]);
-  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
-  const [paginatedSales, setPaginatedSales] = useState<Sale[]>([]);
+  const [allSalesCache, setAllSalesCache] = useState<SaleForPage[]>([]);
+  const [filteredSales, setFilteredSales] = useState<SaleForPage[]>([]);
+  const [paginatedSales, setPaginatedSales] = useState<SaleForPage[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [editingSale, setEditingSale] = useState<SaleForPage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -112,7 +120,7 @@ export default function SalesPage() {
   }), []);
   const [filterCriteria, setFilterCriteria] = useState<SalesFilterCriteria>(initialFilterCriteria);
   
-  const getAvailablePaymentMethods = useCallback((currentSaleMode: 'quick' | 'customer' | null, currentEditingSale: Sale | null) => {
+  const getAvailablePaymentMethods = useCallback((currentSaleMode: 'quick' | 'customer' | null, currentEditingSale: SaleForPage | null) => {
     const isCustomerSale = currentSaleMode === 'customer' || (currentEditingSale && currentEditingSale.customerId);
     if (isCustomerSale) {
       return [...basePaymentMethods, customerSpecificPaymentMethod];
@@ -137,7 +145,7 @@ export default function SalesPage() {
 
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
 
-  const applyFilters = useCallback((dataToFilter: Sale[], criteria: SalesFilterCriteria) => {
+  const applyFilters = useCallback((dataToFilter: SaleForPage[], criteria: SalesFilterCriteria) => {
     let processedSales = [...dataToFilter];
 
     if (criteria.customerName) {
@@ -154,14 +162,14 @@ export default function SalesPage() {
     if (criteria.startDate) {
       const startDateFilter = startOfDay(criteria.startDate);
       processedSales = processedSales.filter(sale => {
-        const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
+        const saleDate = sale.date; // Already a Date object
         return saleDate >= startDateFilter;
       });
     }
     if (criteria.endDate) {
       const endDateFilter = endOfDay(criteria.endDate);
       processedSales = processedSales.filter(sale => {
-        const saleDate = sale.date instanceof Timestamp ? sale.date.toDate() : sale.date;
+        const saleDate = sale.date; // Already a Date object
         return saleDate <= endDateFilter;
       });
     }
@@ -178,12 +186,19 @@ export default function SalesPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          ...data,
+          customerId: data.customerId,
+          customerName: data.customerName,
+          value: data.value,
+          paymentMethod: data.paymentMethod,
+          status: data.status,
+          gasCanistersQuantity: data.gasCanistersQuantity,
+          observations: data.observations,
+          subtractFromStock: data.subtractFromStock,
+          lucro_bruto: data.lucro_bruto,
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
           paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
           createdAt: data.createdAt,
-          lucro_bruto: data.lucro_bruto,
-        } as Sale;
+        } as SaleForPage;
       });
       setAllSalesCache(salesData);
       applyFilters(salesData, filterCriteria); 
@@ -250,9 +265,9 @@ export default function SalesPage() {
           customerName: editingSale.customerName || (editingSale.customerId ? (customer?.name || "") : "Consumidor Final"),
           value: editingSale.value,
           paymentMethod: defaultPaymentMethod,
-          date: editingSale.date instanceof Date ? editingSale.date : (editingSale.date as unknown as Timestamp).toDate(),
+          date: editingSale.date,
           status: editingSale.status,
-          paymentDueDate: editingSale.paymentDueDate instanceof Date ? editingSale.paymentDueDate : (editingSale.paymentDueDate ? (editingSale.paymentDueDate as unknown as Timestamp).toDate() : null),
+          paymentDueDate: editingSale.paymentDueDate,
           gasCanistersQuantity: editingSale.gasCanistersQuantity,
           observations: editingSale.observations || '',
           subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
@@ -305,7 +320,7 @@ export default function SalesPage() {
   };
 
 
-  const handleEditSale = (sale: Sale) => {
+  const handleEditSale = (sale: SaleForPage) => {
     setEditingSale(sale);
     setIsFormOpen(true);
   };
@@ -493,11 +508,11 @@ export default function SalesPage() {
                       <TableCell>{formatCurrency(sale.value)}</TableCell>
                       <TableCell>{sale.lucro_bruto !== undefined ? formatCurrency(sale.lucro_bruto) : "N/A"}</TableCell>
                       <TableCell>{sale.paymentMethod}</TableCell>
-                      <TableCell>{format(sale.date instanceof Timestamp ? sale.date.toDate() : sale.date, "dd/MM/yyyy")}</TableCell>
+                      <TableCell>{format(sale.date, "dd/MM/yyyy")}</TableCell>
                       <TableCell>{saleStatuses.find(s => s.value === sale.status)?.label || sale.status}</TableCell>
                       <TableCell>
                         {sale.status === 'Pending' && sale.paymentDueDate 
-                          ? format(sale.paymentDueDate instanceof Date ? sale.paymentDueDate : (sale.paymentDueDate as unknown as Timestamp).toDate(), "dd/MM/yyyy") 
+                          ? format(sale.paymentDueDate, "dd/MM/yyyy") 
                           : "-"}
                       </TableCell>
                       <TableCell>{sale.gasCanistersQuantity}</TableCell>

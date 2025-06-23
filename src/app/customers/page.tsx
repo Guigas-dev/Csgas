@@ -70,11 +70,15 @@ export default function CustomersPage() {
       const customersData = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return { 
-          id: docSnap.id, 
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-        } as unknown as Customer;
+          id: docSnap.id,
+          name: data.name,
+          cpf: data.cpf,
+          street: data.street,
+          number: data.number,
+          neighborhood: data.neighborhood,
+          referencePoint: data.referencePoint,
+          phone: data.phone,
+        } as Customer;
       });
       setAllCustomersCache(customersData);
     } catch (error) {
