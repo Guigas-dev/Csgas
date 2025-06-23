@@ -739,7 +739,7 @@ export default function SalesPage() {
                     <PopoverContent className="w-auto p-0 bg-card">
                       <Calendar
                         mode="single"
-                        selected={formData.paymentDueDate}
+                        selected={formData.paymentDueDate || undefined}
                         onSelect={(date) => setFormData({...formData, paymentDueDate: date || null})}
                         initialFocus
                         disabled={isSubmitting}
@@ -867,7 +867,7 @@ export default function SalesPage() {
                   <PopoverContent className="w-auto p-0 bg-card">
                     <Calendar
                       mode="single"
-                      selected={filterCriteria.startDate}
+                      selected={filterCriteria.startDate || undefined}
                       onSelect={(date) => setFilterCriteria(prev => ({...prev, startDate: date || null}))}
                       initialFocus
                     />
@@ -893,7 +893,7 @@ export default function SalesPage() {
                   <PopoverContent className="w-auto p-0 bg-card">
                     <Calendar
                       mode="single"
-                      selected={filterCriteria.endDate}
+                      selected={filterCriteria.endDate || undefined}
                       onSelect={(date) => setFilterCriteria(prev => ({...prev, endDate: date || null}))}
                       initialFocus
                     />
