@@ -19,9 +19,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    allowedDevOrigins: ["https://6000-firebase-studio-1748807358440.cluster-iesosxm5fzdewqvhlwn5qivgry.cloudworkstations.dev"]
-  },
   // output: 'standalone', // Removido para Vercel
 };
 
