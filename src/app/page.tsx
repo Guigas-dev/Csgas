@@ -26,7 +26,7 @@ import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, orderBy, Timestamp, where, limit } from "firebase/firestore";
 import type { StockMovementEntry } from "./stock/actions";
 import type { DefaultEntry } from "./defaults/actions";
-import type { Sale } from "./sales/actions";
+import type { Sale as FirestoreSale } from "./sales/actions";
 
 
 const salesBarChartConfig = {
@@ -92,6 +92,14 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, subText, icon, valueCol
   );
 };
 
+// Define a local type for dashboard data, converting Timestamps to Dates for UI components
+type SaleForDashboard = Omit<FirestoreSale, 'date' | 'paymentDueDate' | 'createdAt' | 'updatedAt'> & {
+  date: Date;
+  paymentDueDate: Date | null;
+  createdAt?: Timestamp;
+};
+
+
 const FIXED_CURRENT_PRICE = 94.00;
 const defaultGasPrices = {
   current: FIXED_CURRENT_PRICE,
@@ -116,7 +124,7 @@ export default function DashboardPage() {
   const [averageTicketMonth, setAverageTicketMonth] = useState<number | null>(null);
   const [newSalesTodayCount, setNewSalesTodayCount] = useState<number | null>(null);
   const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
-  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+  const [recentSales, setRecentSales] = useState<SaleForDashboard[]>([]);
 
   const [isLoadingSalesKpi, setIsLoadingSalesKpi] = useState(true);
   const [isLoadingCustomersKpi, setIsLoadingCustomersKpi] = useState(true);
@@ -185,8 +193,14 @@ export default function DashboardPage() {
           const data = doc.data();
           return {
             id: doc.id,
-            ...data,
+            customerId: data.customerId,
+            customerName: data.customerName,
+            saleId: data.saleId,
+            value: data.value,
+            paymentStatus: data.paymentStatus,
             dueDate: (data.dueDate as Timestamp)?.toDate ? (data.dueDate as Timestamp).toDate() : new Date(),
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
           } as DefaultEntry;
         }).filter(d => d.paymentStatus === "Pending");
         setDefaultingCustomers(defaultsData);
@@ -204,13 +218,23 @@ export default function DashboardPage() {
       try {
         const salesQuery = query(collection(db, "sales"), orderBy("date", "desc"));
         const querySnapshot = await getDocs(salesQuery);
-        const salesData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
-          } as Sale;
+        const salesData: SaleForDashboard[] = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                customerId: data.customerId,
+                customerName: data.customerName,
+                value: data.value,
+                paymentMethod: data.paymentMethod,
+                status: data.status,
+                gasCanistersQuantity: data.gasCanistersQuantity,
+                observations: data.observations,
+                subtractFromStock: data.subtractFromStock,
+                lucro_bruto: data.lucro_bruto,
+                date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
+                paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
+                createdAt: data.createdAt,
+            };
         });
 
         setRecentSales(salesData.slice(0, 4));
@@ -288,7 +312,7 @@ export default function DashboardPage() {
     fetchDefaults();
     fetchSalesData();
     fetchCustomerCount();
-  }, []);
+  }, [toast]);
 
   const handleEditPrices = () => {
     setEditedPrices(prev => ({ ...prev, cash: gasPrices.cash, card: gasPrices.card }));
@@ -736,4 +760,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
