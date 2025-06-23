@@ -74,7 +74,7 @@ export default function CustomersPage() {
           ...data,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-        } as Customer;
+        } as unknown as Customer;
       });
       setAllCustomersCache(customersData);
     } catch (error) {
