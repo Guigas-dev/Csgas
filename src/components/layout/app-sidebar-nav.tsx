@@ -155,7 +155,7 @@ export function AppSidebarNav() {
         <SidebarContent className="p-4">
           <SidebarMenu>
             {navItems.map((item) => {
-              const isActiveParent = item.subItems?.some(sub => pathname.startsWith(sub.href)) || (item.href && pathname.startsWith(item.href));
+              const isActiveParent = !!(item.subItems?.some(sub => pathname.startsWith(sub.href)) || (item.href && pathname.startsWith(item.href)));
               
               const tooltipConfig = {
                 children: item.label,
