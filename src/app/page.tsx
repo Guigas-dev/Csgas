@@ -99,10 +99,8 @@ type SaleForDashboard = Omit<FirestoreSale, 'date' | 'paymentDueDate' | 'created
   createdAt?: Timestamp;
 };
 
-
-const FIXED_CURRENT_PRICE = 94.00;
 const defaultGasPrices = {
-  current: FIXED_CURRENT_PRICE,
+  current: 94.00,
   cash: 120.00,
   card: 125.00,
 };
@@ -144,10 +142,11 @@ export default function DashboardPage() {
         if (
           parsedPrices &&
           typeof parsedPrices.cash === 'number' &&
-          typeof parsedPrices.card === 'number'
+          typeof parsedPrices.card === 'number' &&
+          typeof parsedPrices.current === 'number'
         ) {
           activeGasPrices = {
-            current: FIXED_CURRENT_PRICE,
+            current: parsedPrices.current,
             cash: parsedPrices.cash,
             card: parsedPrices.card,
           };
@@ -315,13 +314,13 @@ export default function DashboardPage() {
   }, [toast]);
 
   const handleEditPrices = () => {
-    setEditedPrices(prev => ({ ...prev, cash: gasPrices.cash, card: gasPrices.card }));
+    setEditedPrices(prev => ({ ...prev, current: gasPrices.current, cash: gasPrices.cash, card: gasPrices.card }));
     setIsEditingPrices(true);
   };
 
   const handleSavePrices = () => {
     const pricesToSave = {
-      current: FIXED_CURRENT_PRICE,
+      current: editedPrices.current,
       cash: editedPrices.cash,
       card: editedPrices.card,
     };
@@ -348,7 +347,7 @@ export default function DashboardPage() {
     setIsEditingPrices(false);
   };
 
-  const handlePriceInputChange = (key: keyof Omit<typeof gasPrices, 'current'>, value: string) => {
+  const handlePriceInputChange = (key: keyof typeof gasPrices, value: string) => {
     setEditedPrices(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
   };
 
@@ -429,9 +428,18 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center space-x-2 mb-1">
                 <Flame className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Atual</span>
+                <span className="text-sm text-muted-foreground">Custo</span>
               </div>
-              <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
+              {isEditingPrices ? (
+                <Input
+                  type="number"
+                  value={editedPrices.current}
+                  onChange={(e) => handlePriceInputChange('current', e.target.value)}
+                  className="bg-input text-foreground text-xl font-bold p-2 h-auto"
+                />
+              ) : (
+                <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.current)}</p>
+              )}
               <p className="text-xs text-muted-foreground mt-0.5">Botijão P13</p>
             </div>
 
@@ -451,12 +459,7 @@ export default function DashboardPage() {
                 <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.cash)}</p>
               )}
                <p className="text-xs text-success mt-0.5">
-                {isEditingPrices && gasPrices.current > editedPrices.cash
-                  ? `Desconto de ${formatCurrency(gasPrices.current - editedPrices.cash)}`
-                  : !isEditingPrices && gasPrices.current > gasPrices.cash
-                  ? `Desconto de ${formatCurrency(gasPrices.current - gasPrices.cash)}`
-                  : " "
-                }
+                Lucro de {formatCurrency((isEditingPrices ? editedPrices.cash : gasPrices.cash) - (isEditingPrices ? editedPrices.current : gasPrices.current))}
               </p>
             </div>
 
@@ -475,7 +478,9 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-xl font-bold text-foreground">{formatCurrency(gasPrices.card)}</p>
               )}
-              <p className="text-xs text-muted-foreground mt-0.5">Débito ou Crédito</p>
+               <p className="text-xs text-success mt-0.5">
+                Lucro de {formatCurrency((isEditingPrices ? editedPrices.card : gasPrices.card) - (isEditingPrices ? editedPrices.current : gasPrices.current))}
+              </p>
             </div>
           </div>
           {isEditingPrices && (

@@ -32,6 +32,7 @@ export interface SaleFormData {
   observations: string;
   subtractFromStock: boolean;
   lucro_bruto?: number; // Lucro bruto da venda de botijões
+  custo_botijao?: number;
 }
 
 export interface Sale extends Omit<SaleFormData, 'date' | 'paymentDueDate'> {
@@ -41,8 +42,6 @@ export interface Sale extends Omit<SaleFormData, 'date' | 'paymentDueDate'> {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
-
-const CUSTO_BOTIJAO = 94.00;
 
 export async function addOrUpdateSale(
   data: SaleFormData, 
@@ -64,6 +63,7 @@ export async function addOrUpdateSale(
     }
 
     // --- Prepare Sale Payload ---
+    const custoBotijao = data.custo_botijao || 94.00; // Fallback to default if not provided
     const saleDataForFirestore = {
       customerId: payloadCustomerId,
       customerName: payloadCustomerName,
@@ -75,7 +75,8 @@ export async function addOrUpdateSale(
       gasCanistersQuantity: Number(data.gasCanistersQuantity) || 0,
       observations: data.observations || '',
       subtractFromStock: data.subtractFromStock,
-      lucro_bruto: (Number(data.value) || 0) - (CUSTO_BOTIJAO * (Number(data.gasCanistersQuantity) || 0)),
+      lucro_bruto: (Number(data.value) || 0) - (custoBotijao * (Number(data.gasCanistersQuantity) || 0)),
+      custo_botijao: custoBotijao, // Save the cost price used for this sale
     };
 
     // --- Create or Update Sale Doc ---
@@ -183,3 +184,5 @@ export async function deleteSale(saleId: string): Promise<{ success: boolean; er
     return { success: false, error: errorMessage };
   }
 }
+
+    

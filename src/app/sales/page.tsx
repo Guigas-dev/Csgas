@@ -110,6 +110,7 @@ export default function SalesPage() {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [saleMode, setSaleMode] = useState<'quick' | 'customer' | null>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [costPrice, setCostPrice] = useState(94.00);
 
   const initialFilterCriteria: SalesFilterCriteria = useMemo(() => ({
     customerName: '',
@@ -141,9 +142,24 @@ export default function SalesPage() {
     gasCanistersQuantity: 1,
     observations: '',
     subtractFromStock: true,
-  }), []);
+    custo_botijao: costPrice,
+  }), [costPrice]);
 
   const [formData, setFormData] = useState<SaleFormData>(initialFormData);
+
+  useEffect(() => {
+    const storedPricesJSON = localStorage.getItem('gasPrices');
+    if (storedPricesJSON) {
+      try {
+        const parsedPrices = JSON.parse(storedPricesJSON);
+        if (parsedPrices && typeof parsedPrices.current === 'number') {
+          setCostPrice(parsedPrices.current);
+        }
+      } catch (error) {
+        console.error("Failed to parse gas prices from localStorage for cost price:", error);
+      }
+    }
+  }, []);
 
   const applyFilters = useCallback((dataToFilter: SaleForPage[], criteria: SalesFilterCriteria) => {
     let processedSales = [...dataToFilter];
@@ -195,6 +211,7 @@ export default function SalesPage() {
           observations: data.observations,
           subtractFromStock: data.subtractFromStock,
           lucro_bruto: data.lucro_bruto,
+          custo_botijao: data.custo_botijao,
           date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
           paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
           createdAt: data.createdAt,
@@ -271,6 +288,7 @@ export default function SalesPage() {
           gasCanistersQuantity: editingSale.gasCanistersQuantity,
           observations: editingSale.observations || '',
           subtractFromStock: editingSale.subtractFromStock !== undefined ? editingSale.subtractFromStock : true,
+          custo_botijao: editingSale.custo_botijao || costPrice,
         });
       } else {
          if (saleMode === 'quick') {
@@ -293,7 +311,7 @@ export default function SalesPage() {
         }
       }
     }
-  }, [isFormOpen, editingSale, customers, initialFormData, saleMode, getAvailablePaymentMethods]);
+  }, [isFormOpen, editingSale, customers, initialFormData, saleMode, getAvailablePaymentMethods, costPrice]);
 
   useEffect(() => {
     if (formData.status !== 'Pending') {
@@ -357,8 +375,11 @@ export default function SalesPage() {
     
     const customersForAction = customers.map(c => ({ id: c.id, name: c.name }));
 
+    // Ensure the latest cost price is included in the payload
+    const payload = { ...formData, custo_botijao: costPrice };
+
     const result = await addOrUpdateSale(
-      formData,
+      payload,
       customersForAction,
       saleMode,
       editingSale?.id
@@ -911,3 +932,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
