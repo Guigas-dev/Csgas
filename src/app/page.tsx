@@ -233,7 +233,7 @@ export default function DashboardPage() {
                 date: (data.date as Timestamp)?.toDate ? (data.date as Timestamp).toDate() : new Date(),
                 paymentDueDate: (data.paymentDueDate as Timestamp)?.toDate ? (data.paymentDueDate as Timestamp).toDate() : null,
                 createdAt: data.createdAt,
-            };
+            } as SaleForDashboard;
         });
 
         setRecentSales(salesData.slice(0, 4));
