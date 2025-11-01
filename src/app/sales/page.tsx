@@ -809,7 +809,7 @@ export default function SalesPage() {
             <SheetClose asChild>
                 <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
             </SheetClose>
-            <Button type="submit" form="sale-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting || (saleMode === 'customer' && !formData.customerId && !editingSale) || (editingSale && editingSale.customerId && !formData.customerId)}>
+            <Button type="submit" form="sale-form" className="bg-primary hover:bg-primary-hover-bg text-primary-foreground" disabled={isSubmitting || !!(saleMode === 'customer' && !formData.customerId && !editingSale) || !!(editingSale && editingSale.customerId && !formData.customerId)}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingSale ? "Salvar Alterações" : "Registrar Venda")}
             </Button>
           </SheetFooter>
@@ -932,5 +932,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
